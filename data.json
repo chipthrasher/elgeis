@@ -1,0 +1,100 @@
+{
+  "Ashdale": {
+    "X": 3,
+    "Z": 156,
+    "District": "Cascadia",
+    "Description": "Once a thriving community, now a war-torn ruin marking the destruction that befell the land of Cascadia.",
+    "Image": "images/ashdale.png"
+  },
+  "Churrotown": {
+    "X": 33,
+    "Z": 168,
+    "District": "Cascadia",
+    "Description": "The most recent Cascadian development, headed by current leader churrolover16.",
+    "Image": "images/churro.png"
+  },
+  "Skeleton Farm": {
+    "X": 9,
+    "Z": 171,
+    "District": "Cascadia",
+    "Description": "A converted Cascadian skeleton farm structured for wolves to level up alongside their humans.",
+    "Image": "images/skeleton.png"
+  },
+  "Northeast Sea": {
+    "X": 183,
+    "Z": -183,
+    "District": "Panhy",
+    "Description": "An ocean claim by tEM_fLAKs that goes all the way up to the northeast world border.",
+    "Image": "images/ne.png"
+  },
+  "Pillager Outpost": {
+    "X": 171,
+    "Z": -148,
+    "District": "Cascadia",
+    "Description": "A converted pillager outpost owned by Cascadia.",
+    "Image": "images/pillager.png"
+  },
+  "Ice Spikes": {
+    "X": 170,
+    "Z": 93,
+    "District": "",
+    "Description": "A historic preservation biome that features a magnificent collection of natural ice sculptures.",
+    "Image": "images/ice.png"
+  },
+  "Edoras": {
+    "X": 93,
+    "Z": 105,
+    "District": "Caladium",
+    "Description": "The mushroom city in Caladium, known for its massive cobblestone tower.",
+    "Image": "images/edoras.png"
+  },
+  "Caladium": {
+    "X": 103,
+    "Z": 76,
+    "District": "Caladium",
+    "Description": "A beautiful kingdom located in the birch flower forest and mushroom island. Its capital city is Aster.",
+    "Image": "images/caladium.png"
+  },
+  "Cascadian Desert": {
+    "X": -87,
+    "Z": -172,
+    "District": "Cascadia",
+    "Description": "The northern deserts used by Cascadia.",
+    "Image": "images/desert.png"
+  },
+  "OverLord": {
+    "X": 130,
+    "Z": 15,
+    "District": "OverLord",
+    "Description": "straycat11's forest nation.",
+    "Image": "images/overlord.png"
+  },
+  "Ejypt": {
+    "X": 3,
+    "Z": -55,
+    "District": "Ejypt",
+    "Description": "Ejypt's once peaceful and agrarian fields now lie in desolation and abandonment.",
+    "Image": "images/ejypt.png"
+  },
+  "Panhy": {
+    "X": 35,
+    "Z": 69,
+    "District": "PANHY",
+    "Description": "tEM_flAKs's mesa settlement.",
+    "Image": "images/panhy.png"
+  },
+  "Spawn": {
+    "X": 15,
+    "Z": -8,
+    "District": "",
+    "Description": "The server's spawn area: an intersection between forest plains, desert, ocean, and mesa.",
+    "Image": "images/spawn.png"
+  },
+  "The Oz Bay": {
+    "X": -9,
+    "Z": 153,
+    "District": "Cascadia",
+    "Description": "AdilOzbay's Cascadian home.",
+    "Image": "images/ozbay.png"
+  }
+}
