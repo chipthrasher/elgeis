@@ -18,3 +18,7 @@ I am not sure if layers should go in a file or in a database.
 Layers should have 1 to many Admins (users) who can approve change requests. Change requests are basically diffs to the layer. Like adding a polygon or changing a polygon's points. Ideally the layer should be formatted in a way that can have diffs.
 
 How would you recommend storing layer data? To start we will likely have 2 big layers and maybe 30 community supported smaller layers. The political map may store 300 polygons, some of which have 100-plus XY points making up their border. Plus metadata for each polygon. 
+
+## Authentication
+
+Authentication is handled by a separate auth system running alongside the map, probably [Authentik](https://goauthentik.io/), which the map uses as an OpenID Connect provider. Users register with their Minecraft player name as their username. Admins and change-request authors are identified by that name.
