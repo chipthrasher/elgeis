@@ -100,16 +100,20 @@ a {
   font-size: 2rem;
   font-weight: 900;
   text-align: center;
+  margin-bottom: 1rem;
+}
+
+.info, .subtitle {
+  text-align: center;
+  color: var(--col-light);
+  font-weight: 500;
+  font-style: italic;
   margin-bottom: 1.75rem;
+  line-height: 1.75rem;
 }
 
 .subtitle {
-  text-align: center;
-  color: #aaa;
-  font-weight: 500;
-  font-style: italic;
-  margin-bottom: 0.75rem;
-  line-height: 1.75rem;
+  font-size: 1.2rem;
 }
 
 .tiny {
@@ -119,11 +123,11 @@ a {
   margin: 1rem 0;
 }
 
-.subtitle a {
+.info a {
   color: var(--col-lightest);
 }
 
-.subtitle a:hover {
+.info a:hover {
   color: var(--col-lighter);
 }
 
