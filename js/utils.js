@@ -3,10 +3,10 @@
 
 // --- Constants ---------------------------------------------------------------
 
-// Distance between the world border and (0, 0) in the Nether. Computed from
+// Distance between the world border and (0, 0) in the Overworld. Computed from
 // the live dynmap world border by mapsize.sh and published in config.json;
 // this is only the fallback used until that value loads.
-export let MAP_SIZE_MULTIPLIER = 687.5
+export let MAP_SIZE = 5500
 
 // Duration (ms) of the directory slide / map pan animations.
 export const ANIM_LEN = 200
@@ -32,9 +32,9 @@ export function tsvJSON(tsv) {
     })
 }
 
-// Override the multiplier with the value published in config.json (if any).
+// Override the map size with the value published in config.json (if any).
 export function setMapSize(value) {
-    if (value) MAP_SIZE_MULTIPLIER = value
+    if (value) MAP_SIZE = value
 }
 
 export async function loadConfig() {

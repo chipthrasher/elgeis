@@ -1,6 +1,6 @@
 // Builds the directory list and the SVG portal/line markup from map data.
 
-import { MAP_SIZE_MULTIPLIER as M } from './utils.js'
+import { MAP_SIZE } from './utils.js'
 import { findClosestX, findClosestZ, lineDrawingMode } from './geometry.js'
 import { el, svg, svgFromMarkup, safeUrl } from './dom.js'
 
@@ -9,6 +9,9 @@ const SVG_FLAG = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
 const SVG_APERTURE = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-aperture"><circle cx="12" cy="12" r="10"></circle><line x1="14.31" y1="8" x2="20.05" y2="17.94"></line><line x1="9.69" y1="8" x2="21.17" y2="8"></line><line x1="7.38" y1="12" x2="13.12" y2="2.06"></line><line x1="9.69" y1="16" x2="3.95" y2="6.06"></line><line x1="14.31" y1="16" x2="2.83" y2="16"></line><line x1="16.62" y1="12" x2="10.88" y2="21.94"></line></svg>'
 const SVG_BOOK = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>'
 const SVG_ALERT = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-alert-triangle"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
+
+// Convert a Nether coordinate to SVG space, whose origin is the top-left corner.
+const toSvg = v => MAP_SIZE / 8 + v
 
 function iconSpan(className, title, markup) {
     return el('span', { class: className, title }, svgFromMarkup(markup))
@@ -85,16 +88,16 @@ function buildPortalGroup(id, p, innerLines) {
     if (mode !== 'none')
         children.push(svg('line', {
             class: 'line', 'data-inner': dataInner, 'data-snap': 'auto',
-            x1: M + x, y1: M + z, x2: M + x2, y2: M + z2,
+            x1: toSvg(x), y1: toSvg(z), x2: toSvg(x2), y2: toSvg(z2),
         }))
 
     if (p['National']) {
         children.push(svg('g', { 'data-name': id, 'data-inner': dataInner, class: 'circle' }, [
-            svg('circle', { class: 'circle-national-ring', cx: M + x, cy: M + z }),
-            svg('circle', { class: 'circle-national', cx: M + x, cy: M + z }),
+            svg('circle', { class: 'circle-national-ring', cx: toSvg(x), cy: toSvg(z) }),
+            svg('circle', { class: 'circle-national', cx: toSvg(x), cy: toSvg(z) }),
         ]))
     } else {
-        children.push(svg('circle', { 'data-name': id, 'data-inner': dataInner, class: 'circle', cx: M + x, cy: M + z }))
+        children.push(svg('circle', { 'data-name': id, 'data-inner': dataInner, class: 'circle', cx: toSvg(x), cy: toSvg(z) }))
     }
 
     return svg('g', { 'data-name': id, 'data-inner': dataInner }, children)
@@ -104,7 +107,7 @@ function buildInnerLine(line) {
     return svg('line', {
         class: 'line', role: 'inner', 'data-name': line.ID,
         'data-main': line.main === 1 ? 'true' : '',
-        x1: M + line.x1, y1: M + line.z1, x2: M + line.x2, y2: M + line.z2,
+        x1: toSvg(line.x1), y1: toSvg(line.z1), x2: toSvg(line.x2), y2: toSvg(line.z2),
     })
 }
 
