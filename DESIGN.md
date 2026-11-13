@@ -7,7 +7,6 @@ Right now, this repo has a lot of functionality for the Nether highway with line
 To make this possible we need to define layers. Layers need to be able to have certain objects in them, such as:
 - Polygons
   - Name
-  - Hidden description
 - Lines
 - Landmarks (points)
 Objects should all have a unique ID
