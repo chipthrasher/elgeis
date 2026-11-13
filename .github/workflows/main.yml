@@ -43,30 +43,3 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         default_bump: patch
-
-  sync:
-    # Only deploy master, and only if linting passed.
-    needs: tag
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2
-
-    # Pull the existing config down. Add tag to config.json from the CI tag.
-    - name: Write version into config
-      env:
-        APP_VERSION: ${{ needs.tag.outputs.new_tag }}
-      run: |
-        aws s3 cp s3://nelt.chipthrasher.com/config.json config.json || echo '{}' > config.json
-        jq --arg v "$APP_VERSION" '.version = $v' config.json > config.tmp && mv config.tmp config.json
-
-    - name: Sync to S3
-      run: aws s3 sync . s3://nelt.chipthrasher.com
