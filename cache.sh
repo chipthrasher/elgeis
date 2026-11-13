@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Pull map data from Google Sheets.
-# Since the Nelt map data is cached in production, you will need to download it directly to test locally.
+# Since the Elgeis map data is cached in production, you will need to download it directly to test locally.
 
 mkdir -p $(pwd)/data
 

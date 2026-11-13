@@ -1,5 +1,5 @@
 // Shared constants, generic helpers, and the data-schema definitions for the
-// Nelt map.
+// Elgeis map.
 
 // --- Constants ---------------------------------------------------------------
 
