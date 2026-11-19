@@ -148,8 +148,11 @@ export interface LayerObject {
 export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
     const properties: Record<string, z.ZodType> = { hidden: z.boolean().optional() }
     for (const field of layer.fields) properties[field.key] = FIELD_VALUES[field.type].optional()
-    // An empty label means no override, so it can sit ready to be filled in.
-    if (layer.labelField) properties[layer.labelField] = z.string().optional()
+    // Text fields other than the title can be empty, ready to be filled in. An
+    // empty label means no override.
+    for (const field of layer.fields) {
+        if (field.type === 'text' && field.key !== layer.titleField) properties[field.key] = z.string().optional()
+    }
 
     return z.object({
         type: z.literal('Feature'),

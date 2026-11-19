@@ -90,8 +90,8 @@ test('valuesOf lists references and entity names', () => {
     assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'entities'), ['Adfelis', 'Emeraldia'])
 })
 
-test('a layer\'s label field can be empty', () => {
-    const labeled = objectSchema(Layer.parse({ ...layer, fields: [...layer.fields, { key: 'label', label: 'Label', type: 'text' }], labelField: 'label' }))
-    assert.ok(labeled.safeParse({ ...portal, properties: { ...portal.properties, label: '' } }).success)
-    assert.ok(!labeled.safeParse({ ...portal, properties: { ...portal.properties, name: '' } }).success)
+test('text fields other than the title can be empty', () => {
+    const withNotes = objectSchema(Layer.parse({ ...layer, fields: [...layer.fields, { key: 'notes', label: 'Notes', type: 'text' }] }))
+    assert.ok(withNotes.safeParse({ ...portal, properties: { ...portal.properties, notes: '' } }).success)
+    assert.ok(!withNotes.safeParse({ ...portal, properties: { ...portal.properties, name: '' } }).success)
 })
