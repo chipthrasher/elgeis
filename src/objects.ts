@@ -1,7 +1,7 @@
 // Looks up objects across every layer and follows the references between them,
 // e.g. from a portal to its nation, or from a nation back to its polygons.
 
-import { entityName, type Field, type Geometry, type LayerObject, type Position } from '../shared/layer.ts'
+import { entityName, valuesOf, type Field, type Geometry, type LayerObject, type Position } from '../shared/layer.ts'
 import type { MapObject } from './layers.ts'
 
 export class ObjectIndex {
@@ -63,20 +63,14 @@ export class ObjectIndex {
     // An object's color fields, or else the colors of what it references. A
     // polygon claimed by several nations gets several colors.
     colors(o: MapObject): string[] {
-        const own = valuesOfType(o, 'color')
-        return own.length ? own : this.references(o).flatMap(r => valuesOfType(r, 'color'))
+        const colorsOf = (m: MapObject) => valuesOf(m.layer, m.object, 'color')
+        const own = colorsOf(o)
+        return own.length ? own : this.references(o).flatMap(colorsOf)
     }
 }
 
 const ownTitle = (o: MapObject) => (o.object.properties[o.layer.titleField] as string | undefined) ?? ''
 const ownLabel = (o: MapObject) => (o.layer.labelField && o.object.properties[o.layer.labelField] as string | undefined) || ''
-
-function valuesOfType(o: MapObject, type: string): string[] {
-    return o.layer.fields
-        .filter(f => f.type === type)
-        .map(f => o.object.properties[f.key])
-        .filter((v): v is string => typeof v === 'string')
-}
 
 // The block position of an object's point, if it has one.
 export function position(object: LayerObject): Position | null {

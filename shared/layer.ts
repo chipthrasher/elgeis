@@ -165,9 +165,9 @@ export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
     ) as z.ZodType<LayerObject>
 }
 
-// The values of an object's fields of one type, flattened: the IDs of its
-// reference fields, or the names in its entities fields.
-export function valuesOf(layer: Layer, object: LayerObject, type: 'reference' | 'entities'): string[] {
+// The string values of an object's fields of one type, flattened, e.g. the IDs
+// of its reference fields or the names in its entities fields.
+export function valuesOf(layer: Layer, object: LayerObject, type: FieldType): string[] {
     return layer.fields
         .filter(f => f.type === type)
         .flatMap(f => object.properties[f.key] ?? [])

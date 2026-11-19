@@ -12,7 +12,7 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 ### Milestone 2: Backend skeleton
 
-7. **Docker Compose.** `proxy` (Caddy serving the frontend and built JSON, routing `/api`), `backend` (Hono "hello"), `postgres`, plus `.env.example`. `compose.dev.yaml` mounts the frontend, runs the backend in watch mode, and adds Mailpit.
+7. **Docker Compose.** `proxy` (Caddy serving the frontend and built JSON, routing `/api`), `backend` (Hono "hello"), `postgres`, plus `.env.example`. `compose.dev.yaml` mounts the frontend, runs the backend in watch mode, and adds Mailpit. A "Deploying" section in the README: set the site URL to the public `https://` address, have the proxy send `X-Forwarded-For`/`X-Forwarded-Proto` and list it as trusted, set up SPF and DKIM, and copy the backups volume off the machine.
 8. **Database and migrations.** Kysely setup, a migration runner, and the base tables: layers, layer admins, change requests, comments, and app state.
 9. **Authentication.** Better Auth with email-link sign-in over SMTP, usernames, long-lived cookie sessions, and the admin plugin. Sign-in UI on the map. Seed script for a test site admin and a test regular user.
 
@@ -35,3 +35,7 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 19. **Backups.** A `backup` service that dumps Postgres nightly into the backups volume. Verify that pushes to the layers remote work after every commit.
 20. **Replace the Google Form.** Replace the "Let us know" Google Form link with change requests.
+
+### Milestone 6: Nether highway
+
+21. **Bring back the Nether highway.** Remove `nether` from `PAUSED` in `src/main.ts` so its portals and lines show on the map and in the directory again, and fix whatever needs fixing for it to render well alongside the political layer.
