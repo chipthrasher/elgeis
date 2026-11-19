@@ -1,6 +1,6 @@
 *.DS_Store
-data/*
 .env
 config.json
 node_modules/
 dist/
+.venv/
