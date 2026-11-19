@@ -19,7 +19,7 @@ export function createMap(mapSize: number): L.Map {
         center: [0, 0],
     })
 
-    L.imageOverlay('political.jpg', [[-mapSize, -mapSize], [mapSize, mapSize]], { className: 'political-image' }).addTo(map)
+    L.imageOverlay('political.jpg', [[-mapSize, -mapSize], [mapSize, mapSize]], { className: 'political-image', pane: 'tilePane' }).addTo(map)
 
     // Coordinate readout (top-left), updated as the mouse moves.
     const readout = L.DomUtil.create('div', 'leaflet-control-coordinates')

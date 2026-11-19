@@ -28,7 +28,7 @@
   --col-innerlines: var(--col-lighter);
   --col-circles: var(--col-lightest);
 
-  --opacity-political: 0.4;
+  --opacity-political: 0.7;
   --line-width: 0.12rem;
   --box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
   --box-shadow-dark: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.4);
@@ -306,7 +306,7 @@ a {
 .polygon {
   stroke: black;
   stroke-width: 1.5px;
-  fill-opacity: 0.5;
+  fill-opacity: 0.7;
 }
 
 .point.highlight {
@@ -319,7 +319,7 @@ a {
 }
 
 .polygon.highlight {
-  fill-opacity: 0.6;
+  fill-opacity: 0.85;
 }
 
 /* Names inside polygons. The span is centered on the icon, which Leaflet
