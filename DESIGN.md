@@ -61,13 +61,43 @@ To start we will likely have 2 big layers and maybe 30 community supported small
 Storage is split between git and Postgres:
 
 - **Git holds the approved layer data.** Each layer is a folder of GeoJSON files, one file per object, written with consistent formatting so diffs stay clean. The backend is the only thing that writes to the repo. Each approved change request becomes one commit, with the requester as author and the approving admin in the commit message. History, reverts, and backups (by pushing to a remote) come from git.
-- **Postgres holds everything else:** pending change requests (drafts, submitted, rejected, stale), review comments, layer admins, and app state like rate limits and the email notification queue. Postgres is already needed for Authentik, so it's one database server. User accounts live in Authentik; the backend only stores Authentik user IDs.
+- **Approving writes git first, then Postgres.** Approvals run one at a time, so two admins can't collide on the repo. Each commit message includes the change request ID. On startup, the backend checks recent commits against Postgres and marks any request that was committed but never marked approved, which repairs a crash between the two writes.
+- **Postgres holds everything else:** pending change requests (drafts, submitted, rejected, stale), review comments, layer admins, and app state like rate limits and the email notification queue. User accounts and sessions live there too.
 - **Past borders come from git history.** There's no time slider for now, so objects don't need dates. If we add a slider later, we'll decide then whether dates use real-world time, Elgeis lore time, or both.
 - **The public map reads static JSON.** After each commit, the backend builds each layer into a single static JSON file, so the public map stays fast and cacheable.
 
+## Backend
+
+The backend is Node.js with TypeScript, using [Hono](https://hono.dev/) for routing, `pg` with [Kysely](https://kysely.dev/) for Postgres, and the `git` CLI for commits and pushes. TypeScript lets the browser editor and the backend share one validation module, so they always agree on what a valid change request is.
+
 ## Authentication
 
-Authentication is handled by a separate auth system running alongside the map, probably [Authentik](https://goauthentik.io/), which the map uses as an OpenID Connect provider. Users pick any username; it doesn't have to match their Minecraft player name. Accounts require email verification, with mail sent through Fastmail SMTP. Admins and change-request authors are identified by their account.
+Auth runs inside the backend using [Better Auth](https://www.better-auth.com/), which is MIT-licensed and stores its tables in our Postgres. There's no separate auth service.
+
+- **Users sign in with an email link.** Clicking the link verifies the email, so there are no passwords to store or reset. Mail goes out over SMTP.
+- **Users pick any username.** It doesn't have to match their Minecraft player name.
+- **Sessions are cookies.** The backend gets the current user from Better Auth on each request.
+- **Email is the only way in, so sessions last a long time.** If SMTP breaks or sign-in links land in spam, people who are already signed in stay signed in. Passkeys (a Better Auth plugin) could be added later as a second way to sign in.
+- **Site admins and bans use Better Auth's admin plugin.** Layer admins live in our own table, because they're set per layer.
+
+## Deployment
+
+The whole site runs with Docker Compose, like most self-hosted software. `docker compose up -d` starts everything, on a laptop or a server.
+
+- **Services:**
+  - `proxy`: [Caddy](https://caddyserver.com/). It serves the frontend and the built layer JSON, and routes `/api` to the backend.
+  - `backend`: the API, including auth. It's the only writer to the layers git repo.
+  - `postgres`: the database.
+  - `backup`: dumps Postgres on a schedule into a backups volume.
+- **One HTTP port is exposed.** HTTPS and exposing the site to the internet are up to whoever runs it: a reverse proxy, a tunnel, or whatever they already use.
+- **Configuration lives in `.env`:** the site URL, trusted proxy addresses, the database password, the auth secret, and SMTP settings. A committed `.env.example` lists every variable.
+- **Data lives in named volumes:** the layers git repo, the built layer JSON, Postgres, and Postgres backups.
+- **Backups:** the backend pushes the layers repo to a git remote after every commit, and the `backup` service dumps Postgres nightly. The operator copies the backups volume off the machine. Losing Postgres loses only pending change requests and accounts; approved map data is safe in git.
+
+### Dev
+
+- **`compose.dev.yaml` adds dev-only changes:** frontend files mounted from your checkout, the backend in watch mode, and [Mailpit](https://mailpit.axllent.org/) to catch sign-in emails instead of sending them.
+- **A seed script creates a test site admin and a test regular user.**
 
 ## Migrating off Google Sheets
 
