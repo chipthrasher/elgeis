@@ -3,23 +3,32 @@
 import L from 'leaflet'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
-import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
+import { addPanes, colorPolygons, loadLayers } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
 
-// The layers being viewed are kept in ?layers=, so views can be shared. With no
-// param, the official layers show.
-function initialLayers(layers: MapLayer[]): MapLayer[] {
-    const param = getParam('layers')
-    if (param === null) return layers.filter(l => l.layer.official)
-    const ids = param.split(',')
-    return layers.filter(l => ids.includes(l.layer.id))
+// Everything the layers control can show or hide: each map layer, plus the
+// dynmap image beneath them.
+interface Toggle {
+    id: string
+    name: string
+    group: L.Layer
+    // Shown when there's no ?layers= param.
+    byDefault: boolean
 }
 
-function saveLayers(layers: MapLayer[], shown: MapLayer[]) {
-    const isDefault = layers.every(l => shown.includes(l) === !!l.layer.official)
-    setParam('layers', isDefault ? null : shown.map(l => l.layer.id).join(','))
+// What's being viewed is kept in ?layers=, so views can be shared.
+function showInitial(map: L.Map, toggles: Toggle[]) {
+    const param = getParam('layers')
+    const ids = param?.split(',')
+    for (const t of toggles) if (ids ? ids.includes(t.id) : t.byDefault) t.group.addTo(map)
+}
+
+function save(map: L.Map, toggles: Toggle[]) {
+    const shown = toggles.filter(t => map.hasLayer(t.group))
+    const isDefault = toggles.every(t => shown.includes(t) === t.byDefault)
+    setParam('layers', isDefault ? null : shown.map(t => t.id).join(','))
 }
 
 // Layers that are loaded (so references to them resolve) but can't be shown.
@@ -29,13 +38,17 @@ const PAUSED = ['nether']
 async function main() {
     const allLayers = await loadLayers()
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
-    const map = createMap()
+    const { map, dynmap } = createMap()
     addPanes(map)
 
-    for (const l of initialLayers(layers)) l.group.addTo(map)
-    const overlays = Object.fromEntries(layers.map(l => [l.layer.name, l.group]))
+    const toggles: Toggle[] = [
+        ...layers.map(l => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official })),
+        { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true },
+    ]
+    showInitial(map, toggles)
+    const overlays = Object.fromEntries(toggles.map(t => [t.name, t.group]))
     L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
-    map.on('overlayadd overlayremove', () => saveLayers(layers, layers.filter(l => map.hasLayer(l.group))))
+    map.on('overlayadd overlayremove', () => save(map, toggles))
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))

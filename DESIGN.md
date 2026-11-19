@@ -95,3 +95,8 @@ The whole site runs with Docker Compose, like most self-hosted software. `docker
 ## Migrating off Google Sheets
 
 Done. The Sheet was imported once (portals and highway lines into the Nether layer, nations into political-layer entities, computed connectors as stored LineStrings, `Hide` rows as hidden objects), and then retired along with `cache.sh` and the import script. The political polygons were traced once from the map's Paint.NET file (the import scripts are in git history). `layers/` is now the only source of map data.
+
+## Random future ideas
+
+Not roadmapped yet. A thing that lets you take a screenshot of the entire map area (but does the work entirely in the browser).
+More granular control over opacity of layers.

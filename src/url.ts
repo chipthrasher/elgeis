@@ -4,9 +4,10 @@ export function getParam(name: string): string | null {
     return new URLSearchParams(location.search).get(name)
 }
 
+// null removes the param; '' keeps it, empty.
 export function setParam(name: string, value: string | null) {
     const params = new URLSearchParams(location.search)
-    if (value) params.set(name, value)
+    if (value !== null) params.set(name, value)
     else params.delete(name)
     // Commas are safe in a query string and keep ?layers= readable.
     const query = params.toString().replace(/%2C/g, ',')

@@ -1,4 +1,4 @@
-// Creates the Leaflet map, the political background image, and the coordinate
+// Creates the Leaflet map, the dynmap background image, and the coordinate
 // readout.
 
 import L from 'leaflet'
@@ -12,7 +12,7 @@ export const toLatLng = (x: number, z: number) => L.latLng(-z, x)
 // Distance from (0, 0) to the world border in the Overworld.
 const MAP_SIZE = 5500
 
-export function createMap(): L.Map {
+export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
     const map = L.map('layers', {
         crs: L.CRS.Simple,
         zoom: -3,
@@ -22,7 +22,9 @@ export function createMap(): L.Map {
         center: [0, 0],
     })
 
-    L.imageOverlay('political.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'political-image', pane: 'tilePane' }).addTo(map)
+    // A render of the world from the server's dynmap, drawn beneath every layer.
+    // main.ts decides whether it shows.
+    const dynmap = L.imageOverlay('dynmap.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'dynmap', pane: 'tilePane' })
 
     // Coordinate readout (top-left), updated as the mouse moves.
     const readout = L.DomUtil.create('div', 'leaflet-control-coordinates')
@@ -37,5 +39,5 @@ export function createMap(): L.Map {
         )
     })
 
-    return map
+    return { map, dynmap }
 }

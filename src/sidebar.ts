@@ -179,7 +179,7 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
     function search() {
         if (searchInput.value === lastQuery) return
         lastQuery = searchInput.value
-        setParam('q', searchInput.value)
+        setParam('q', searchInput.value || null)
 
         const query = searchInput.value.toLowerCase()
         const matched = new Set(listed.filter(o => haystacks.get(o)!.includes(query)))

@@ -29,7 +29,7 @@
   --col-innerlines: var(--col-lighter);
   --col-circles: var(--col-lightest);
 
-  --opacity-political: 0.7;   /* the base map image */
+  --opacity-dynmap: 0.7;      /* the base map image */
   --opacity-polygons: 0.5;    /* political region fills */
   --opacity-polygons-hover: 0.5;
 
@@ -281,8 +281,8 @@ a {
   z-index: 1;
 }
 
-.political-image {
-  opacity: var(--opacity-political);
+.dynmap {
+  opacity: var(--opacity-dynmap);
 }
 
 /* Map objects */
