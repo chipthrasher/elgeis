@@ -44,6 +44,9 @@ export async function loadLayers(): Promise<MapLayer[]> {
     }))
 }
 
+// For polygons whose nation has no color yet.
+const NO_COLOR = '#888'
+
 // Polygons get their own pane so they always sit below lines and points, no
 // matter which layer is toggled on last.
 export function addPanes(map: L.Map) {
@@ -62,7 +65,7 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         style: feature => {
             const polygon = /Polygon/.test(feature?.geometry.type ?? '')
             return polygon
-                ? { className: 'polygon', pane: 'polygons' }
+                ? { className: 'polygon', pane: 'polygons', color: NO_COLOR, fillColor: NO_COLOR }
                 : { className: 'line', interactive: false }
         },
     })
@@ -100,7 +103,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
-const STRIPE = 6 // px
+const STRIPE = 8 // px
 
 // Diagonal stripes, one per color.
 function hatch(id: string, colors: string[]): SVGPatternElement {

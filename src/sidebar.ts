@@ -132,18 +132,19 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         directory.append(section)
     }
 
-    // Only list the layers being viewed.
+    // Only list the layers being viewed that have entries matching the search.
     function showSections() {
-        for (const [mapLayer, section] of sections) section.classList.toggle('hidden', !map.hasLayer(mapLayer.group))
+        for (const [mapLayer, section] of sections) {
+            const empty = !section.querySelector('.item:not(.hidden)')
+            section.classList.toggle('hidden', empty || !map.hasLayer(mapLayer.group))
+        }
     }
     map.on('overlayadd overlayremove', () => {
-        showSections()
         // Leaflet redraws a layer's elements when it's re-added, which drops
         // their classes, so search again.
         lastQuery = null
         search()
     })
-    showSections()
 
     /* Search: text fields, referenced titles, and coordinates */
 
@@ -175,6 +176,7 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             item.classList.toggle('hidden', !show)
             item.open = false
         }
+        showSections()
     }
 
     function setSearch(value: string) {
