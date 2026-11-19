@@ -1,5 +1,19 @@
 # Elgeis Map
 
+## Developing
+
+You need Node 22.18 or newer (see `.nvmrc`).
+
+```sh
+npm install
+./cache.sh     # download the Google Sheet data into data/
+npm run dev    # serve the map at http://localhost:8000
+npm run lint   # ESLint and TypeScript
+npm test
+```
+
+`npm run build` writes the bundled JavaScript to `dist/`, which isn't committed.
+
 ## Deploying
 
 1. Copy `.env.example` to `.env` and fill it in.

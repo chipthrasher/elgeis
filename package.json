@@ -1,0 +1,26 @@
+{
+  "name": "elgeis-map",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "scripts": {
+    "build": "esbuild main.js --bundle --format=esm --outdir=dist",
+    "dev": "esbuild main.js --bundle --format=esm --outdir=dist --servedir=.",
+    "lint": "eslint . && tsc",
+    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'"
+  }
+}

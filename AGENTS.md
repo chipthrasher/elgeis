@@ -14,7 +14,6 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 The map runs entirely on layer folders in git, with no backend. Edits happen by hand-editing GeoJSON, the same way the Sheet works today.
 
-1. **Shared data module (TypeScript).** Types and validation for layer manifests (dimension, schema fields, title field, icons), objects (Point/LineString/Polygon/MultiPolygon with integer `[x, z]`, `hidden`), and entities. Includes prefixed random ID generation (`pol_`, `ent_`, `lay_`, …) and a canonical JSON formatter so diffs stay clean. Add a `package.json`, `tsconfig.json`, and a test runner. Replace `deno lint` in CI with ESLint/tsc. Decide how the browser loads TS (likely esbuild).
 2. **Layer build script.** Turns `layers/<id>/` (manifest + one file per object) into one static `<id>.json` per layer plus an index of layers. Leaves out hidden objects and validates everything with item 1.
 3. **Google Sheets import script.** Converts `map.tsv`, `lines.tsv`, and `colors.tsv` into `layers/nether/` (portals, highway lines, stored connector LineStrings) and `layers/political/` (nations as entities). Rows marked `Hide` become hidden objects. Commit the result.
 4. **Generic layer rendering.** The frontend loads the built layer JSON and draws points, lines, and polygons, scaling Nether layers by 8. Layer toggles in `#layers`, and a `?layers=` URL param that works alongside `q`.
