@@ -12,7 +12,6 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 ### Milestone 2: Backend skeleton
 
-8. **Database and migrations.** Kysely setup, a migration runner, and the base tables: layers, layer admins, change requests, comments, and app state.
 9. **Authentication.** Better Auth with email-link sign-in over SMTP, usernames, long-lived cookie sessions, and the admin plugin. Sign-in UI on the map. Seed script for a test site admin and a test regular user.
 
 ### Milestone 3: Change requests

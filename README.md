@@ -11,6 +11,8 @@ npm run lint   # ESLint and TypeScript
 npm test
 ```
 
+Database tests are skipped unless `DATABASE_URL` points at a Postgres server where they can create throwaway databases, e.g. `DATABASE_URL=postgres://postgres:test@localhost:5432/postgres npm test`. Migrations live in `backend/migrations/` and run when the backend starts; `node backend/migrate.ts down` undoes the last one.
+
 Map data lives in `layers/<id>/`: a `layer.json` manifest plus one GeoJSON file per object. `npm run build` validates it and writes the static layer JSON and the bundled JavaScript to `dist/`, which isn't committed.
 
 ### The whole site
