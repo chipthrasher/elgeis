@@ -4,23 +4,22 @@ import L from 'leaflet'
 import { loadConfig, showConfig } from './config.ts'
 import { createMap } from './map.ts'
 import { addPanes, loadLayers, type MapLayer } from './layers.ts'
+import { ObjectIndex } from './objects.ts'
+import { createSidebar } from './sidebar.ts'
+import { getParam, setParam } from './url.ts'
 
 // The layers being viewed are kept in ?layers=, so views can be shared. With no
 // param, the official layers show.
 function initialLayers(layers: MapLayer[]): MapLayer[] {
-    const param = new URLSearchParams(location.search).get('layers')
+    const param = getParam('layers')
     if (param === null) return layers.filter(l => l.layer.official)
     const ids = param.split(',')
     return layers.filter(l => ids.includes(l.layer.id))
 }
 
 function saveLayers(layers: MapLayer[], shown: MapLayer[]) {
-    const params = new URLSearchParams(location.search)
     const isDefault = layers.every(l => shown.includes(l) === !!l.layer.official)
-    if (isDefault) params.delete('layers')
-    else params.set('layers', shown.map(l => l.layer.id).join(','))
-    const query = params.toString().replace(/%2C/g, ',')
-    history.replaceState(null, '', location.pathname + (query ? '?' + query : ''))
+    setParam('layers', isDefault ? null : shown.map(l => l.layer.id).join(','))
 }
 
 async function main() {
@@ -33,6 +32,7 @@ async function main() {
     L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
     map.on('overlayadd overlayremove', () => saveLayers(layers, layers.filter(l => map.hasLayer(l.group))))
 
+    createSidebar(map, layers, new ObjectIndex(layers.flatMap(l => l.objects)))
     showConfig(config)
 }
 

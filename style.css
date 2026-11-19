@@ -147,25 +147,34 @@ a {
 
 /* Directory */
 
+#directory h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+  color: var(--col-light);
+  margin: 1.5rem 1.8rem 0.5rem;
+}
+
 .item {
   font-size: 1rem;
   font-weight: 500;
   margin: 0.4rem;
 }
 
-.itemtop {
+.item summary {
   cursor: pointer;
-  background: var(--darker);
   display: flex;
+  list-style: none;
   transition: 0.2s all;
   border-radius: 0.5rem;
 }
 
-.itemtop:hover {
-  background: var(--col-dark);
+.item summary::-webkit-details-marker {
+  display: none;
 }
 
-.itemtopHover {
+.item summary:hover,
+.item summary.hover {
   background: var(--col-dark);
 }
 
@@ -182,43 +191,36 @@ a {
 
 .itemcontent {
   padding: 1rem 2rem;
-  display: none;
 }
 
-.itemcontent .name {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.itemcontent .entity {
-  font-size: 1rem;
+.itemcontent .reference {
   font-style: italic;
   color: #aaa;
-  font-weight: 500;
-
   margin-bottom: 0.75rem;
+}
+
+.itemcontent .reference span {
   cursor: pointer;
   transition: 0.2s all;
 }
 
-.itemcontent .entity:hover {
+.itemcontent .reference span + span::before {
+  content: " / ";
+}
+
+.itemcontent .reference span:hover {
   color: var(--col-lightest);
 }
 
-.itemcontent .wiki {
+.itemcontent .link {
   display: block;
-  font-size: 1rem;
   font-style: italic;
-  font-weight: 500;
-
   color: var(--col-light);
-
   padding-bottom: 1rem;
-  text-decoration: none;
   transition: 0.2s all;
 }
 
-.itemcontent .wiki:hover {
+.itemcontent .link:hover {
   color: var(--col-lightest);
 }
 
@@ -230,40 +232,37 @@ a {
   margin-bottom: 0.75rem;
 }
 
-.itemcontent .description {
+.itemcontent .text {
   font-size: 0.9rem;
   margin: 1rem 0;
   font-weight: 400;
 }
 
-.itemcontent span {
-  font-size: 1.25rem;
-  transition: 0.2s all;
-  display: inline;
+.itemcontent .icon {
+  display: inline-block;
   margin-right: 0.75rem;
   color: var(--col-light);
+  transition: 0.2s all;
 }
 
-.ibwh,
-.nation,
-.end,
-.warning {
-  display: none;
+.itemcontent .icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.ibwh:hover {
+.icon-book:hover {
   color: var(--col-pastel-blue);
 }
 
-.nation:hover {
+.icon-flag:hover {
   color: var(--col-pastel-green);
 }
 
-.end:hover {
+.icon-aperture:hover {
   color: var(--col-pastel-purple);
 }
 
-.warning:hover {
+.icon-alert:hover {
   color: var(--col-pastel-red);
 }
 
@@ -309,6 +308,29 @@ a {
   fill-opacity: 0.35;
 }
 
+.point.highlight {
+  box-shadow: 0 0 0 3px white;
+}
+
+.line.highlight {
+  stroke: white;
+  stroke-opacity: 1;
+}
+
+.polygon.highlight {
+  fill-opacity: 0.6;
+}
+
+/* Objects that don't match the search. Polygons stay as context. */
+.point.unmatched,
+.line.unmatched {
+  display: none;
+}
+
+.polygon.unmatched {
+  opacity: 0.3;
+}
+
 .hidden {
   display: none;
 }
@@ -321,8 +343,9 @@ a {
   padding: 0.6rem;
 }
 
-/* Tooltip */
+/* Tooltips: tippy for icons, Leaflet's for map objects */
 
+.leaflet-tooltip,
 [data-tippy-root] {
   box-shadow: var(--box-shadow-dark);
   font-family: inherit;
@@ -341,11 +364,16 @@ a {
   background: inherit;
 }
 
+.leaflet-tooltip::before {
+  display: none;
+}
+
+.leaflet-tooltip .name,
 [data-tippy-root] .name {
   font-weight: 500;
 }
 
-[data-tippy-root] .coords {
+.leaflet-tooltip .coords {
   font-family: var(--font-sans);
   color: var(--col-light);
   font-weight: 500;
@@ -365,7 +393,30 @@ a {
   font-family: var(--font-mono);
 }
 
-.leaflet-control-coordinates.hidden {
+.leaflet-control-coordinates.point.highlight {
+  box-shadow: 0 0 0 3px white;
+}
+
+.line.highlight {
+  stroke: white;
+  stroke-opacity: 1;
+}
+
+.polygon.highlight {
+  fill-opacity: 0.6;
+}
+
+/* Objects that don't match the search. Polygons stay as context. */
+.point.unmatched,
+.line.unmatched {
+  display: none;
+}
+
+.polygon.unmatched {
+  opacity: 0.3;
+}
+
+.hidden {
   display: none;
 }
 
