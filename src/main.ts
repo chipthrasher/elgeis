@@ -3,6 +3,7 @@
 import L from 'leaflet'
 import { loadConfig, showConfig } from './config.ts'
 import { createMap } from './map.ts'
+import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
@@ -34,6 +35,7 @@ async function main() {
 
     const index = new ObjectIndex(layers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
+    addLabels(map, index.all, o => index.title(o))
     createSidebar(map, layers, index)
     showConfig(config)
 }

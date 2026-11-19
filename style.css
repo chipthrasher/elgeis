@@ -321,6 +321,29 @@ a {
   fill-opacity: 0.6;
 }
 
+/* Names inside polygons. The span is centered on the icon, which Leaflet
+   centers on the label's point. */
+.polygon-label span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--col-lightest);
+  text-shadow: 0 0 3px var(--col-darkest), 0 0 6px var(--col-darkest);
+  pointer-events: none;
+}
+
+.polygon-label span.too-small {
+  visibility: hidden;
+}
+
+.polygon-label.unmatched {
+  opacity: 0.3;
+}
+
 /* Clicking an object focuses it; don't draw the browser's focus box. */
 .leaflet-interactive:focus {
   outline: none;
