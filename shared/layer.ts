@@ -39,7 +39,9 @@ export const DIMENSION_SCALE: Record<Dimension, number> = { overworld: 1, nether
 export const ICONS = ['flag', 'aperture', 'book', 'alert'] as const
 export type Icon = typeof ICONS[number]
 
-export const FIELD_TYPES = ['text', 'url', 'color', 'flag', 'reference'] as const
+// `entities` lists entities by name, like ["Redstone Valley"], so a polygon
+// can be tied to its nation (or a disputed one to several) in plain text.
+export const FIELD_TYPES = ['text', 'url', 'color', 'flag', 'reference', 'entities'] as const
 export type FieldType = typeof FIELD_TYPES[number]
 
 const fieldKey = z.string().regex(/^[a-z][a-zA-Z0-9]*$/, 'Expected a camelCase field key')
@@ -129,6 +131,7 @@ const FIELD_VALUES: Record<FieldType, z.ZodType> = {
     color: z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"'),
     flag: z.boolean(),
     reference: z.union([objectId, z.array(objectId).min(1)]),
+    entities: z.array(z.string().min(1)).min(1),
 }
 
 export type PropertyValue = string | boolean | string[]
@@ -145,6 +148,8 @@ export interface LayerObject {
 export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
     const properties: Record<string, z.ZodType> = { hidden: z.boolean().optional() }
     for (const field of layer.fields) properties[field.key] = FIELD_VALUES[field.type].optional()
+    // An empty label means no override, so it can sit ready to be filled in.
+    if (layer.labelField) properties[layer.labelField] = z.string().optional()
 
     return z.object({
         type: z.literal('Feature'),
@@ -157,10 +162,15 @@ export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
     ) as z.ZodType<LayerObject>
 }
 
-// The IDs an object references through its reference fields.
-export function referencedIds(layer: Layer, object: LayerObject): string[] {
+// The values of an object's fields of one type, flattened: the IDs of its
+// reference fields, or the names in its entities fields.
+export function valuesOf(layer: Layer, object: LayerObject, type: 'reference' | 'entities'): string[] {
     return layer.fields
-        .filter(f => f.type === 'reference')
+        .filter(f => f.type === type)
         .flatMap(f => object.properties[f.key] ?? [])
         .filter((v): v is string => typeof v === 'string')
 }
+
+// An entity's name, which entities fields refer to it by.
+export const entityName = (layer: Layer, object: LayerObject) =>
+    object.id.startsWith('ent_') ? object.properties[layer.titleField] as string | undefined : undefined

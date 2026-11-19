@@ -34,8 +34,11 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
     /* Highlighting: an object, plus everything it references or is referenced by */
 
     function highlight(o: MapObject, on: boolean) {
-        for (const related of [o, ...index.references(o), ...index.referencers(o)]) {
-            for (const element of elementsOf(related)) element.classList.toggle('highlight', on)
+        // Including what shares a reference, like the other polygons of a nation.
+        const references = index.references(o)
+        const related = [o, ...references, ...index.referencers(o), ...references.flatMap(r => index.referencers(r))]
+        for (const r of related) {
+            for (const element of elementsOf(r)) element.classList.toggle('highlight', on)
         }
         items.get(o)?.querySelector('summary')?.classList.toggle('hover', on)
     }
@@ -54,9 +57,10 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             }
             case 'flag':
                 return value ? el('div', { class: 'text' }, field.label) : null
-            case 'reference': {
+            case 'reference':
+            case 'entities': {
                 // Each referenced title links to a search for it.
-                const titles = index.references(o).map(r => index.title(r)).filter(Boolean)
+                const titles = index.resolve(o, field).map(r => index.title(r)).filter(Boolean)
                 return titles.length ? el('div', { class: 'reference' }, titles.map(t => el('span', { 'data-search': t }, t))) : null
             }
             case 'color':
@@ -75,7 +79,7 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
 
     function buildItem(o: MapObject): HTMLDetailsElement {
         const pos = position(o.object)
-        const fields = o.layer.fields.filter(f => f.key !== o.layer.titleField && o.object.properties[f.key] !== undefined)
+        const fields = o.layer.fields.filter(f => f.key !== o.layer.titleField && o.object.properties[f.key] !== undefined && o.object.properties[f.key] !== '')
         const color = index.colors(o)[0]
 
         return el('details', { class: 'item' }, [

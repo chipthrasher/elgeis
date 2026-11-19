@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Layer, newId, idPrefixFor, objectSchema, referencedIds } from './layer.ts'
+import { Layer, newId, idPrefixFor, objectSchema, valuesOf } from './layer.ts'
 
 const layer = Layer.parse({
     id: 'nether',
@@ -12,7 +12,8 @@ const layer = Layer.parse({
         { key: 'wiki', label: 'Wiki', type: 'url' },
         { key: 'color', label: 'Color', type: 'color' },
         { key: 'national', label: 'National', type: 'flag', icon: 'flag', ring: true },
-        { key: 'entity', label: 'Entity', type: 'reference' },
+        { key: 'line', label: 'Line', type: 'reference' },
+        { key: 'entities', label: 'Political entities', type: 'entities' },
     ],
 })
 const objects = objectSchema(layer)
@@ -21,7 +22,7 @@ const portal = {
     type: 'Feature',
     id: 'pnt_abc12345',
     geometry: { type: 'Point', coordinates: [78, 428] },
-    properties: { name: 'Adfelis', wiki: 'https://wiki.elgeis.com/wiki/Adfelis', entity: 'ent_xyz98765' },
+    properties: { name: 'Adfelis', wiki: 'https://wiki.elgeis.com/wiki/Adfelis', line: 'lin_xyz98765', entities: ['Emeraldia'] },
 }
 
 test('newId makes prefixed random IDs', () => {
@@ -76,12 +77,21 @@ test('invalid objects fail', () => {
     props({ wiki: 'javascript:alert(1)' })
     props({ color: 'red' })
     props({ national: 'yes' })
-    props({ entity: 'Emeraldia' })
+    props({ line: 'Emeraldia' })
+    props({ entities: 'Emeraldia' })
+    props({ entities: [] })
     props({ hidden: 1 })
 })
 
-test('referencedIds lists single and multiple references', () => {
-    assert.deepEqual(referencedIds(layer, objects.parse(portal)), ['ent_xyz98765'])
-    const disputed = { ...portal, properties: { entity: ['ent_a', 'ent_b'] } }
-    assert.deepEqual(referencedIds(layer, objects.parse(disputed)), ['ent_a', 'ent_b'])
+test('valuesOf lists references and entity names', () => {
+    assert.deepEqual(valuesOf(layer, objects.parse(portal), 'reference'), ['lin_xyz98765'])
+    const disputed = { ...portal, properties: { line: ['lin_a', 'lin_b'], entities: ['Adfelis', 'Emeraldia'] } }
+    assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'reference'), ['lin_a', 'lin_b'])
+    assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'entities'), ['Adfelis', 'Emeraldia'])
+})
+
+test('a layer\'s label field can be empty', () => {
+    const labeled = objectSchema(Layer.parse({ ...layer, fields: [...layer.fields, { key: 'label', label: 'Label', type: 'text' }], labelField: 'label' }))
+    assert.ok(labeled.safeParse({ ...portal, properties: { ...portal.properties, label: '' } }).success)
+    assert.ok(!labeled.safeParse({ ...portal, properties: { ...portal.properties, name: '' } }).success)
 })

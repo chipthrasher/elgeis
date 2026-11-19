@@ -20,16 +20,16 @@ const manifest = {
     name: 'Political',
     dimension: 'overworld',
     titleField: 'name',
-    fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'entity', label: 'Nation', type: 'reference' }],
+    fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'entities', label: 'Political entities', type: 'entities' }],
 }
 const nation = { type: 'Feature', id: 'ent_a', geometry: null, properties: { name: 'Adfelis' } }
 const polygon = {
     type: 'Feature',
     id: 'pol_a',
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 0]]] },
-    properties: { entity: 'ent_a' },
+    properties: { entities: ['Adfelis'] },
 }
-const hidden = { ...polygon, id: 'pol_b', properties: { entity: 'ent_a', hidden: true } }
+const hidden = { ...polygon, id: 'pol_b', properties: { entities: ['Adfelis'], hidden: true } }
 
 test('builds visible objects and an index', () => {
     const src = fixture({
@@ -49,14 +49,17 @@ test('builds visible objects and an index', () => {
 test('reports every problem at once', () => {
     const src = fixture({
         'political/layer.json': manifest,
-        'political/pol_a.json': polygon, // references ent_a, which is missing
-        'political/pol_c.json': { ...polygon, id: 'pol_d' }, // wrong file name, duplicate reference
+        'political/ent_a.json': nation,
+        'political/ent_b.json': { ...nation, id: 'ent_b' }, // duplicate entity name
+        'political/pol_a.json': { ...polygon, properties: { entities: ['Emeraldia'] } }, // no such entity
+        'political/pol_c.json': { ...polygon, id: 'pol_d' }, // wrong file name
         'nether/layer.json': { ...manifest, id: 'wrong' },
     })
     assert.throws(() => buildLayers(src, path.join(src, 'out')), (e: Error) => {
         assert.match(e.message, /doesn't match its folder "nether"/)
         assert.match(e.message, /pol_c\.json: File name doesn't match ID "pol_d"/)
-        assert.match(e.message, /References missing object "ent_a"/)
+        assert.match(e.message, /ent_b\.json: Duplicate entity name "Adfelis"/)
+        assert.match(e.message, /Lists missing entity "Emeraldia"/)
         return true
     })
     assert.ok(!fs.existsSync(path.join(src, 'out')))
