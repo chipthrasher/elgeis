@@ -44,7 +44,7 @@ export function readLayers(dir: string): LayerData[] {
     }
 
     const layers: LayerData[] = []
-    const folders = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name).sort()
+    const folders = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('.')).map(d => d.name).sort()
     for (const folder of folders) {
         const manifestFile = path.join(dir, folder, MANIFEST)
         const layer = parse(Layer, manifestFile)

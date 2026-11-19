@@ -12,7 +12,6 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 ### Milestone 2: Backend skeleton
 
-7. **Docker Compose.** `proxy` (Caddy serving the frontend and built JSON, routing `/api`), `backend` (Hono "hello"), `postgres`, plus `.env.example`. `compose.dev.yaml` mounts the frontend, runs the backend in watch mode, and adds Mailpit. A "Deploying" section in the README: set the site URL to the public `https://` address, have the proxy send `X-Forwarded-For`/`X-Forwarded-Proto` and list it as trusted, set up SPF and DKIM, and copy the backups volume off the machine.
 8. **Database and migrations.** Kysely setup, a migration runner, and the base tables: layers, layer admins, change requests, comments, and app state.
 9. **Authentication.** Better Auth with email-link sign-in over SMTP, usernames, long-lived cookie sessions, and the admin plugin. Sign-in UI on the map. Seed script for a test site admin and a test regular user.
 

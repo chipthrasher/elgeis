@@ -17,6 +17,8 @@
     "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.9",
+    "hono": "^4.13.19",
     "leaflet": "^1.9.4",
     "polylabel": "^2.1.0",
     "tippy.js": "^6.3.7",
@@ -26,6 +28,6 @@
     "build": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
     "dev": "node --watch-path=layers --watch-path=shared --watch-preserve-output scripts/build-layers.ts & esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
     "lint": "eslint . && tsc",
-    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'"
+    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts' 'backend/**/*.test.ts'"
   }
 }

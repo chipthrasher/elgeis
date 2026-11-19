@@ -1,0 +1,46 @@
+# Production: `docker compose up -d`. Configuration is in .env (see .env.example).
+
+services:
+  proxy:
+    build: { context: ., target: proxy }
+    restart: unless-stopped
+    ports: ["${HTTP_PORT:-8080}:80"]
+    environment:
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
+    volumes:
+      - built:/srv/built:ro
+    depends_on: [backend]
+
+  backend:
+    build: { context: ., target: backend }
+    restart: unless-stopped
+    environment:
+      SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
+      DATABASE_URL: postgres://elgeis:${POSTGRES_PASSWORD}@postgres/elgeis
+      LAYERS_REPO: /data/repo
+      LAYERS_BUILD: /data/built/layers
+    volumes:
+      - repo:/data/repo
+      - built:/data/built
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: elgeis
+      POSTGRES_DB: elgeis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U elgeis
+      interval: 2s
+
+volumes:
+  # The layers git repo: approved map data.
+  repo:
+  # Static layer JSON built from the repo, served by the proxy.
+  built:
+  postgres:

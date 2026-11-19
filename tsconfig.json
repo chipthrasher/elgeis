@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "noUncheckedSideEffectImports": false
   },
-  "include": ["shared", "scripts", "src"]
+  "include": ["shared", "scripts", "src", "backend"]
 }
