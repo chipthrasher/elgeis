@@ -65,7 +65,7 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         style: feature => {
             const polygon = /Polygon/.test(feature?.geometry.type ?? '')
             return polygon
-                ? { className: 'polygon', pane: 'polygons', fillColor: NO_COLOR }
+                ? { className: 'polygon', pane: 'polygons', color: NO_COLOR, fillColor: NO_COLOR }
                 : { className: 'line', interactive: false }
         },
     })
@@ -83,7 +83,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
         const colors = colorsOf(o)
         if (colors.length === 0) continue
         if (colors.length === 1) {
-            o.drawn.setStyle({ fillColor: colors[0] })
+            o.drawn.setStyle({ color: colors[0], fillColor: colors[0] })
             continue
         }
         const key = colors.join(',')
@@ -92,7 +92,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
             patterns.set(key, id)
             defs.append(hatch(id, colors))
         }
-        o.drawn.setStyle({ fillColor: `url(#${patterns.get(key)})` })
+        o.drawn.setStyle({ color: colors[0], fillColor: `url(#${patterns.get(key)})` })
     }
 
     // Patterns can be referenced from any SVG on the page, including Leaflet's.
