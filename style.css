@@ -321,6 +321,11 @@ a {
   fill-opacity: 0.6;
 }
 
+/* Clicking an object focuses it; don't draw the browser's focus box. */
+.leaflet-interactive:focus {
+  outline: none;
+}
+
 /* Objects that don't match the search. Polygons stay as context. */
 .point.unmatched,
 .line.unmatched {
@@ -398,33 +403,6 @@ a {
 
 .mono {
   font-family: var(--font-mono);
-}
-
-.leaflet-control-coordinates.point.highlight {
-  box-shadow: 0 0 0 3px white;
-}
-
-.line.highlight {
-  stroke: white;
-  stroke-opacity: 1;
-}
-
-.polygon.highlight {
-  fill-opacity: 0.6;
-}
-
-/* Objects that don't match the search. Polygons stay as context. */
-.point.unmatched,
-.line.unmatched {
-  display: none;
-}
-
-.polygon.unmatched {
-  opacity: 0.3;
-}
-
-.hidden {
-  display: none;
 }
 
 .leaflet-control-coordinates strong {}
