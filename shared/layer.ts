@@ -65,6 +65,8 @@ export const Layer = z.object({
     // Official layers show by default.
     official: z.boolean().optional(),
     titleField: fieldKey,
+    // A shorter name drawn on the map instead of the title, when set.
+    labelField: fieldKey.optional(),
     fields: z.array(Field),
 }).strict().superRefine((layer, ctx) => {
     const keys = layer.fields.map(f => f.key)
@@ -75,6 +77,9 @@ export const Layer = z.object({
     const title = layer.fields.find(f => f.key === layer.titleField)
     if (title?.type !== 'text')
         ctx.addIssue({ code: 'custom', path: ['titleField'], message: `Title field "${layer.titleField}" must be a text field` })
+    const label = layer.fields.find(f => f.key === layer.labelField)
+    if (layer.labelField && label?.type !== 'text')
+        ctx.addIssue({ code: 'custom', path: ['labelField'], message: `Label field "${layer.labelField}" must be a text field` })
 })
 export type Layer = z.infer<typeof Layer>
 

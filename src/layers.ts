@@ -75,6 +75,11 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
                 ? { className: 'polygon', pane: 'polygons', renderer: polygonRenderer, color: NO_COLOR, fillColor: NO_COLOR }
                 : { className: 'line', renderer: lineRenderer, interactive: false }
         },
+        // Tag each element with its object's ID, e.g. `[data-id="pol_8f3k2a9x"]`.
+        // Leaflet makes new elements whenever a layer is re-added, so tag on every add.
+        onEachFeature: (_, drawn) => drawn.on('add', () => {
+            (drawn as L.Path | L.Marker).getElement?.()?.setAttribute('data-id', object.id)
+        }),
     })
 }
 

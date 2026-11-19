@@ -36,6 +36,11 @@ export class ObjectIndex {
         return ownTitle(o) || this.references(o).map(ownTitle).filter(Boolean).join(' / ')
     }
 
+    // The name drawn on the map: like the title, but preferring label fields.
+    label(o: MapObject): string {
+        return ownLabel(o) || this.references(o).map(ownLabel).filter(Boolean).join(' / ')
+    }
+
     // An object's color fields, or else the colors of what it references. A
     // polygon claimed by several nations gets several colors.
     colors(o: MapObject): string[] {
@@ -45,6 +50,7 @@ export class ObjectIndex {
 }
 
 const ownTitle = (o: MapObject) => (o.object.properties[o.layer.titleField] as string | undefined) ?? ''
+const ownLabel = (o: MapObject) => (o.layer.labelField && o.object.properties[o.layer.labelField] as string | undefined) || ownTitle(o)
 
 function valuesOfType(o: MapObject, type: string): string[] {
     return o.layer.fields

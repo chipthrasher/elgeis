@@ -1,6 +1,6 @@
 // Names drawn inside polygons. Each name sits at the point deepest inside its
-// polygon, and only shows once the largest circle that fits there is wide
-// enough for the text, so small polygons get their names as you zoom in.
+// polygon. Names that would overlap are hidden, with roomier polygons getting
+// first pick, so small polygons get their names when nothing's in the way.
 
 import L from 'leaflet'
 import polylabel from 'polylabel'
@@ -11,17 +11,18 @@ import { toLatLng } from './map.ts'
 
 interface Label {
     span: HTMLElement
-    // Diameter of the largest circle inside the polygon, in blocks at its spot.
+    latLng: L.LatLng
+    // Radius of the largest circle inside the polygon, used as priority.
     room: number
 }
 
-export function addLabels(map: L.Map, objects: MapObject[], titleOf: (o: MapObject) => string) {
+export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObject) => string) {
     map.createPane('labels').style.zIndex = '450' // above polygons and lines, below points
     const labels: Label[] = []
 
     for (const o of objects) {
         const geometry = o.object.geometry
-        const title = titleOf(o)
+        const title = labelOf(o)
         if (!o.drawn || !title || (geometry?.type !== 'Polygon' && geometry?.type !== 'MultiPolygon')) continue
 
         // For a MultiPolygon, label the part with the most room.
@@ -32,26 +33,35 @@ export function addLabels(map: L.Map, objects: MapObject[], titleOf: (o: MapObje
         const span = el('span', {}, title)
         // Added to the object's own group, so it shares the object's toggling,
         // hover card, highlighting, and search classes.
-        o.drawn.addLayer(L.marker(toLatLng(pole[0] * scale, pole[1] * scale), {
+        const latLng = toLatLng(pole[0] * scale, pole[1] * scale)
+        o.drawn.addLayer(L.marker(latLng, {
             icon: L.divIcon({ className: 'polygon-label', html: span }),
             interactive: false,
             keyboard: false,
             pane: 'labels',
         }))
-        labels.push({ span, room: 2 * pole.distance * scale })
+        labels.push({ span, latLng, room: pole.distance * scale })
     }
 
-    // A name may run this much wider than the circle and still show; it just
-    // spills a little past the polygon's narrowest edges.
-    const SLACK = 1.5
+    labels.sort((a, b) => b.room - a.room)
 
-    // In Leaflet's Simple CRS, one block is 2^zoom pixels.
+    // Space kept between names, in pixels.
+    const GAP = 4
+
     function fit() {
-        const pixelsPerBlock = 2 ** map.getZoom()
-        for (const { span, room } of labels) {
-            span.classList.toggle('too-small', span.offsetWidth > room * pixelsPerBlock * SLACK)
+        const zoom = map.getZoom()
+        const placed: L.Bounds[] = []
+        for (const { span, latLng } of labels) {
+            // Labels in hidden layers aren't in the page and measure 0.
+            const size = L.point(span.offsetWidth + GAP, span.offsetHeight + GAP)
+            if (size.x === GAP) continue
+            const center = map.project(latLng, zoom)
+            const box = L.bounds(center.subtract(size.divideBy(2)), center.add(size.divideBy(2)))
+            const crowded = placed.some(b => b.overlaps(box))
+            span.classList.toggle('crowded', crowded)
+            if (!crowded) placed.push(box)
         }
     }
-    map.on('zoomend overlayadd', fit)
+    map.on('zoomend overlayadd overlayremove', fit)
     fit()
 }

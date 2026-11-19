@@ -40,7 +40,7 @@ async function main() {
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
-    addLabels(map, index.all, o => index.title(o))
+    addLabels(map, index.all, o => index.label(o))
     createSidebar(map, layers, index)
     showConfig(config)
 }
