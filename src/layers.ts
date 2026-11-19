@@ -67,3 +67,51 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         },
     })
 }
+
+// Fill polygons with their colors (their own, or their nation's). A polygon
+// with several colors, like one claimed by several nations, is hatched in all
+// of them.
+export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => string[]) {
+    const patterns = new Map<string, string>()
+    const defs = document.createElementNS(SVG_NS, 'defs')
+
+    for (const o of objects) {
+        if (!o.drawn || !/Polygon/.test(o.object.geometry?.type ?? '')) continue
+        const colors = colorsOf(o)
+        if (colors.length === 0) continue
+        if (colors.length === 1) {
+            o.drawn.setStyle({ color: colors[0], fillColor: colors[0] })
+            continue
+        }
+        const key = colors.join(',')
+        if (!patterns.has(key)) {
+            const id = `hatch-${patterns.size}`
+            patterns.set(key, id)
+            defs.append(hatch(id, colors))
+        }
+        o.drawn.setStyle({ color: colors[0], fillColor: `url(#${patterns.get(key)})` })
+    }
+
+    // Patterns can be referenced from any SVG on the page, including Leaflet's.
+    const svg = document.createElementNS(SVG_NS, 'svg')
+    svg.setAttribute('class', 'patterns')
+    svg.append(defs)
+    document.body.append(svg)
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const STRIPE = 6 // px
+
+// Diagonal stripes, one per color.
+function hatch(id: string, colors: string[]): SVGPatternElement {
+    const pattern = document.createElementNS(SVG_NS, 'pattern')
+    const attrs = { id, patternUnits: 'userSpaceOnUse', width: String(STRIPE * colors.length), height: '1', patternTransform: 'rotate(45)' }
+    for (const [k, v] of Object.entries(attrs)) pattern.setAttribute(k, v)
+    colors.forEach((color, i) => {
+        const rect = document.createElementNS(SVG_NS, 'rect')
+        const rectAttrs = { x: String(i * STRIPE), y: '0', width: String(STRIPE), height: '1', fill: color }
+        for (const [k, v] of Object.entries(rectAttrs)) rect.setAttribute(k, v)
+        pattern.append(rect)
+    })
+    return pattern
+}

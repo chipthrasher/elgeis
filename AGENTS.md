@@ -10,11 +10,6 @@ If you can accomplish something with less code, please do so. If you can accompl
 
 Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. Items are numbered so they can be approved by number; when one is done, delete it and leave the other numbers alone.
 
-### Milestone 1: Static layers (MVP)
-
-The map runs entirely on layer folders in git, with no backend. Edits happen by hand-editing GeoJSON, the same way the Sheet works today.
-
-6. **Political map rendering.** Polygons are filled with their entity's color, and disputed polygons are hatched in their claimants' colors. Draw some real nation polygons by hand (or trace `political.jpg`) so the layer isn't empty.
 
 ### Milestone 2: Backend skeleton
 

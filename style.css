@@ -335,6 +335,13 @@ a {
   display: none;
 }
 
+/* Holds the hatch patterns for disputed polygons */
+.patterns {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
 .leaflet-control {
   box-shadow: var(--box-shadow);
 }

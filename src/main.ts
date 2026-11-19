@@ -3,7 +3,7 @@
 import L from 'leaflet'
 import { loadConfig, showConfig } from './config.ts'
 import { createMap } from './map.ts'
-import { addPanes, loadLayers, type MapLayer } from './layers.ts'
+import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
@@ -32,7 +32,9 @@ async function main() {
     L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
     map.on('overlayadd overlayremove', () => saveLayers(layers, layers.filter(l => map.hasLayer(l.group))))
 
-    createSidebar(map, layers, new ObjectIndex(layers.flatMap(l => l.objects)))
+    const index = new ObjectIndex(layers.flatMap(l => l.objects))
+    colorPolygons(index.all, o => index.colors(o))
+    createSidebar(map, layers, index)
     showConfig(config)
 }
 
