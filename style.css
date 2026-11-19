@@ -150,6 +150,68 @@ a {
   width: 80%;
 }
 
+/* Account */
+
+.account {
+  text-align: center;
+  color: var(--col-light);
+  font-size: 0.9rem;
+  margin: -2rem 0 1rem;
+}
+
+.account:empty {
+  display: none;
+}
+
+.account strong,
+.account .link {
+  color: var(--col-lightest);
+}
+
+.account .link {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.account .link:hover {
+  color: var(--col-lighter);
+}
+
+.account .row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.account input,
+.account button:not(.link) {
+  font: inherit;
+  color: var(--col-lightest);
+  background: var(--col-dark);
+  border: 0.1rem solid var(--col-dark);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.account input {
+  flex: 1;
+  min-width: 0;
+}
+
+.account button:not(.link) {
+  white-space: nowrap;
+  cursor: pointer;
+  border-color: var(--col-light);
+}
+
+.account .error {
+  color: var(--col-pastel-red);
+}
+
 /* Directory */
 
 #directory h2 {

@@ -1,6 +1,7 @@
 // Entry point
 
 import L from 'leaflet'
+import { createAccount } from './account.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers } from './layers.ts'
@@ -36,6 +37,7 @@ function save(map: L.Map, toggles: Toggle[]) {
 const PAUSED = ['nether']
 
 async function main() {
+    createAccount(document.querySelector('#account')!)
     const allLayers = await loadLayers()
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const { map, dynmap } = createMap()

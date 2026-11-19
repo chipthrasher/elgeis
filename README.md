@@ -26,6 +26,14 @@ docker compose -f compose.yaml -f compose.dev.yaml up --build
 
 The site is at http://localhost:8080. The frontend rebuilds and the backend restarts when you edit files. After changing `package.json`, run the command again so the images are rebuilt.
 
+To sign in, create a test site admin (`admin@example.com`) and a test regular user (`user@example.com`):
+
+```sh
+docker compose exec backend node backend/seed.ts
+```
+
+Then enter one of their emails under "Sign in" and open the link from Mailpit. Any other email works too, as a new account.
+
 ## Deploying
 
 The site runs with Docker Compose. Copy `.env.example` to `.env`, fill it in, and start it:

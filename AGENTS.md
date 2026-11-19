@@ -10,10 +10,6 @@ If you can accomplish something with less code, please do so. If you can accompl
 
 Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. Items are numbered so they can be approved by number; when one is done, delete it and leave the other numbers alone.
 
-### Milestone 2: Backend skeleton
-
-9. **Authentication.** Better Auth with email-link sign-in over SMTP, usernames, long-lived cookie sessions, and the admin plugin. Sign-in UI on the map. Seed script for a test site admin and a test regular user.
-
 ### Milestone 3: Change requests
 
 10. **Change request API.** Create/edit/submit/withdraw drafts made of `add`/`update`/`delete` ops with `baseVersion`, validated with the shared module. Limit of 10 open requests per account. Mark requests stale when their base objects change.

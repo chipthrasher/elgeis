@@ -17,6 +17,9 @@ services:
     environment:
       SITE_URL: ${SITE_URL:?Set SITE_URL in .env}
       DATABASE_URL: postgres://elgeis:${POSTGRES_PASSWORD}@postgres/elgeis
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      SMTP_URL: ${SMTP_URL:?Set SMTP_URL in .env}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in .env}
       LAYERS_REPO: /data/repo
       LAYERS_BUILD: /data/built/layers
     volumes:

@@ -13,6 +13,20 @@ export const CHANGE_REQUEST_STATUSES = ['draft', 'submitted', 'stale', 'approved
 export type ChangeRequestStatus = typeof CHANGE_REQUEST_STATUSES[number]
 
 export interface Database {
+    // Better Auth's, with only the columns we use. It has more tables too.
+    user: {
+        id: string
+        name: string
+        email: string
+        emailVerified: boolean
+        username: string | null
+        displayUsername: string | null
+        // "admin" for site admins.
+        role: string | null
+        banned: boolean | null
+        createdAt: Generated<Date>
+        updatedAt: Generated<Date>
+    }
     // Every layer, official or community. The manifest itself (name, schema)
     // is in the layers repo; this is what Postgres needs to know about it.
     layer: {

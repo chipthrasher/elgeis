@@ -18,6 +18,9 @@ services:
 
   backend:
     command: node --watch backend/main.ts
+    environment:
+      NODE_ENV: development
+      SMTP_URL: smtp://mailpit:1025
     volumes:
       - ./backend:/app/backend:ro
       - ./shared:/app/shared:ro

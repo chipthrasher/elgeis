@@ -18,6 +18,7 @@ test('migrations go up, down, and up again', { skip }, async () => {
 test('change requests check their status and default to drafts', { skip }, async () => {
     const db = await testDb()
     await db.insertInto('layer').values({ id: 'political' }).execute()
+    await db.insertInto('user').values({ id: 'u1', name: '', email: 'a@example.com', emailVerified: true }).execute()
     const request = await db.insertInto('changeRequest')
         .values({ layerId: 'political', authorId: 'u1', ops: JSON.stringify([{ op: 'delete' }]) })
         .returningAll().executeTakeFirstOrThrow()
