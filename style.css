@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap');
 
 :root {
   /* Dark mode */
@@ -30,12 +31,13 @@
 
   --opacity-political: 0.7;   /* the base map image */
   --opacity-polygons: 0.5;    /* political region fills */
-  --opacity-polygons-hover: 0.75;
+  --opacity-polygons-hover: 0.6;
 
   --line-width: 0.12rem;
   --box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
   --box-shadow-dark: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.4);
 
+  --font-serif: "Fraunces", serif;
   --font-sans: "Roboto", sans-serif;
   --font-mono: "Roboto Mono", monospace;
 }
@@ -332,6 +334,7 @@ a {
   top: 50%;
   transform: translate(-50%, -50%);
   white-space: nowrap;
+  font-family: var(--font-serif);
   font-weight: 500;
   font-size: 0.9rem;
   color: var(--col-lightest);

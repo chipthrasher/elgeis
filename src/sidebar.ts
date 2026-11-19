@@ -26,8 +26,10 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
     const items = new Map<MapObject, HTMLDetailsElement>()
 
     // Objects with a title and something on the map are listed and searchable.
-    // The rest (like highway lines) always show.
-    const listed = index.all.filter(o => o.drawn && index.title(o))
+    // The rest (like highway lines) always show. The index can include layers
+    // that aren't shown here, so only list objects from these layers.
+    const shown = new Set(layers.map(l => l.layer))
+    const listed = index.all.filter(o => shown.has(o.layer) && o.drawn && index.title(o))
 
     /* Highlighting: an object, plus everything it references or is referenced by */
 

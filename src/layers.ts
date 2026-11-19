@@ -53,6 +53,13 @@ export function addPanes(map: L.Map) {
     map.createPane('polygons').style.zIndex = '350'
 }
 
+// Leaflet only draws paths within the renderer's bounds (the view plus
+// `padding` on each side, as a fraction of the view) and redraws when a drag
+// ends. With the default 0.1, dragging reveals a blank gap until then.
+const PADDING = 1
+const polygonRenderer = L.svg({ pane: 'polygons', padding: PADDING })
+const lineRenderer = L.svg({ padding: PADDING })
+
 function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     const scale = DIMENSION_SCALE[layer.dimension]
     const ring = layer.fields.some(f => f.ring && object.properties[f.key] === true)
@@ -65,8 +72,8 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         style: feature => {
             const polygon = /Polygon/.test(feature?.geometry.type ?? '')
             return polygon
-                ? { className: 'polygon', pane: 'polygons', color: NO_COLOR, fillColor: NO_COLOR }
-                : { className: 'line', interactive: false }
+                ? { className: 'polygon', pane: 'polygons', renderer: polygonRenderer, color: NO_COLOR, fillColor: NO_COLOR }
+                : { className: 'line', renderer: lineRenderer, interactive: false }
         },
     })
 }

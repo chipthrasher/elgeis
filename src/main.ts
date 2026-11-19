@@ -23,8 +23,13 @@ function saveLayers(layers: MapLayer[], shown: MapLayer[]) {
     setParam('layers', isDefault ? null : shown.map(l => l.layer.id).join(','))
 }
 
+// Layers that are loaded (so references to them resolve) but can't be shown.
+// TODO: bring the Nether highway back.
+const PAUSED = ['nether']
+
 async function main() {
-    const [config, layers] = await Promise.all([loadConfig(), loadLayers()])
+    const [config, allLayers] = await Promise.all([loadConfig(), loadLayers()])
+    const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const map = createMap(config.mapSize ?? 5500)
     addPanes(map)
 
@@ -33,7 +38,7 @@ async function main() {
     L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
     map.on('overlayadd overlayremove', () => saveLayers(layers, layers.filter(l => map.hasLayer(l.group))))
 
-    const index = new ObjectIndex(layers.flatMap(l => l.objects))
+    const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.title(o))
     createSidebar(map, layers, index)
