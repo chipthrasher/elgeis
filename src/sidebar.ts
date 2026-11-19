@@ -79,7 +79,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
 
     function buildItem(o: MapObject): HTMLDetailsElement {
         const pos = position(o.object)
-        const fields = o.layer.fields.filter(f => f.key !== o.layer.titleField && o.object.properties[f.key] !== undefined && o.object.properties[f.key] !== '')
+        // The title is the entry's heading, and the label is only for the map.
+        const fields = o.layer.fields.filter(f => f.key !== o.layer.titleField && f.key !== o.layer.labelField && o.object.properties[f.key] !== undefined)
         const color = index.colors(o)[0]
 
         return el('details', { class: 'item' }, [
