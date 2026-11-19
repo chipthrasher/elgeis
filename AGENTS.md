@@ -10,7 +10,6 @@ If you can accomplish something with less code, please do so. If you can accompl
 
 Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. Items are numbered so they can be approved by number; when one is done, delete it and leave the other numbers alone.
 
-
 ### Milestone 2: Backend skeleton
 
 7. **Docker Compose.** `proxy` (Caddy serving the frontend and built JSON, routing `/api`), `backend` (Hono "hello"), `postgres`, plus `.env.example`. `compose.dev.yaml` mounts the frontend, runs the backend in watch mode, and adds Mailpit.
