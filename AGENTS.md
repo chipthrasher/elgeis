@@ -14,7 +14,6 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 
 The map runs entirely on layer folders in git, with no backend. Edits happen by hand-editing GeoJSON, the same way the Sheet works today.
 
-4. **Generic layer rendering.** The frontend loads the built layer JSON and draws points, lines, and polygons, scaling Nether layers by 8. Layer toggles in `#layers`, and a `?layers=` URL param that works alongside `q`.
 5. **Schema-driven UI.** Popups, hover cards, and directory entries are generated from the layer schema (text/url/flag/reference fields, icons). Search covers text fields and coordinates for every visible layer. Hovering or clicking highlights referenced objects. Delete the Nether-specific code this replaces.
 6. **Political map rendering.** Polygons are filled with their entity's color, and disputed polygons are hatched in their claimants' colors. Draw some real nation polygons by hand (or trace `political.jpg`) so the layer isn't empty.
 

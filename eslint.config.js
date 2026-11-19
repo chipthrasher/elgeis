@@ -8,7 +8,7 @@ export default defineConfig(
     js.configs.recommended,
     tseslint.configs.recommended,
     {
-        languageOptions: { globals: { ...globals.browser, ...globals.node, L: "readonly", tippy: "readonly" } },
+        languageOptions: { globals: { ...globals.browser, ...globals.node } },
         rules: {
             eqeqeq: ['error', 'smart'],
             'guard-for-in': 'error',

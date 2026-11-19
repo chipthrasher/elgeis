@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^22.20.5",
     "esbuild": "^0.28.2",
     "eslint": "^10.15.0",
@@ -15,11 +16,13 @@
     "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
+    "tippy.js": "^6.3.7",
     "zod": "^4.6.7"
   },
   "scripts": {
-    "build": "node scripts/build-layers.ts && esbuild main.js --bundle --format=esm --outdir=dist",
-    "dev": "node scripts/build-layers.ts && esbuild main.js --bundle --format=esm --outdir=dist --servedir=.",
+    "build": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
+    "dev": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
     "lint": "eslint . && tsc",
     "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'",
     "import": "node scripts/import-sheets.ts"
