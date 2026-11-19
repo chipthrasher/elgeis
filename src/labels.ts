@@ -41,11 +41,15 @@ export function addLabels(map: L.Map, objects: MapObject[], titleOf: (o: MapObje
         labels.push({ span, room: 2 * pole.distance * scale })
     }
 
+    // A name may run this much wider than the circle and still show; it just
+    // spills a little past the polygon's narrowest edges.
+    const SLACK = 1.5
+
     // In Leaflet's Simple CRS, one block is 2^zoom pixels.
     function fit() {
         const pixelsPerBlock = 2 ** map.getZoom()
         for (const { span, room } of labels) {
-            span.classList.toggle('too-small', span.offsetWidth > room * pixelsPerBlock)
+            span.classList.toggle('too-small', span.offsetWidth > room * pixelsPerBlock * SLACK)
         }
     }
     map.on('zoomend overlayadd', fit)

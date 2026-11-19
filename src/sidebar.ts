@@ -123,7 +123,10 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             summary.addEventListener('mouseenter', () => { highlight(o, true); o.drawn?.openTooltip() })
             summary.addEventListener('mouseleave', () => { highlight(o, false); o.drawn?.closeTooltip() })
 
-            o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0] })
+            // Polygons have their names drawn inside them instead (see labels.ts).
+            if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
+                o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0] })
+            }
             o.drawn!.on('mouseover', () => highlight(o, true))
             o.drawn!.on('mouseout', () => highlight(o, false))
             o.drawn!.on('click', () => select(o))
