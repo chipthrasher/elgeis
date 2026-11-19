@@ -6,8 +6,6 @@ You need Node 22.18 or newer (see `.nvmrc`).
 
 ```sh
 npm install
-./cache.sh     # download the Google Sheet data into data/
-npm run import # convert data/ into the layer folders in layers/
 npm run dev    # serve the map at http://localhost:8000
 npm run lint   # ESLint and TypeScript
 npm test

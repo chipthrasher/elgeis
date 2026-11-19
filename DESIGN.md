@@ -11,7 +11,7 @@ To make this possible we need to define layers. Layers need to be able to have c
 - Landmarks (points)
 Objects should all have a unique ID
 
-Ideally all the Nelt map functionality would be generalized into a layer. That's hard because the Nelt map has its own search, hover, and click behavior for its circles, and its data is generated from Google Sheets. The JS in `js/` should be loosely coupled, so the little that's specific to the Nelt map is kept apart from what's generalized.
+Ideally all the Nelt map functionality would be generalized into a layer. That's hard because the Nelt map has its own search, hover, and click behavior for its circles, and its data was generated from Google Sheets. The JS in `js/` should be loosely coupled, so the little that's specific to the Nelt map is kept apart from what's generalized.
 
 Layers should have 1 to many Admins (users) who can approve change requests. Change requests are basically diffs to the layer. Like adding a polygon or changing a polygon's points. Ideally the layer should be formatted in a way that can have diffs.
 
@@ -101,7 +101,4 @@ The whole site runs with Docker Compose, like most self-hosted software. `docker
 
 ## Migrating off Google Sheets
 
-- **One-time import.** A script converts `map.tsv`, `lines.tsv`, and `colors.tsv` into the new layer folders: portals and highway lines into the Nether layer, and nations into political-layer entities. Today's computed connectors become stored LineStrings.
-- **Rows marked `Hide` are imported as hidden objects.**
-- **After the import, the sheet is frozen and `cache.sh` is deleted.**
-- **Change requests replace the "Let us know" Google Form.**
+Done. The Sheet was imported once (portals and highway lines into the Nether layer, nations into political-layer entities, computed connectors as stored LineStrings, `Hide` rows as hidden objects), and then retired along with `cache.sh` and the import script. The political polygons were traced once from the map's Paint.NET file (see `scripts/pdn-import/`). `layers/` is now the only source of map data.

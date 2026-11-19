@@ -26,7 +26,6 @@
     "build": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
     "dev": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
     "lint": "eslint . && tsc",
-    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'",
-    "import": "node scripts/import-sheets.ts"
+    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'"
   }
 }

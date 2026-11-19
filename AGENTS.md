@@ -34,4 +34,4 @@ Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. It
 ### Milestone 5: Cutover
 
 19. **Backups.** A `backup` service that dumps Postgres nightly into the backups volume. Verify that pushes to the layers remote work after every commit.
-20. **Retire Google Sheets.** Final import, freeze the Sheet, delete `cache.sh` and the TSV loading code, and replace the "Let us know" Google Form link with change requests.
+20. **Replace the Google Form.** Replace the "Let us know" Google Form link with change requests.
