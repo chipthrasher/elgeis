@@ -20,6 +20,13 @@ function elements(layer: L.Layer): Element[] {
 }
 const elementsOf = (o: MapObject) => o.drawn ? elements(o.drawn) : []
 
+// One solid color, or for a contested object, a band of each color side by side.
+function swatch(colors: string[]): string {
+    if (colors.length === 1) return colors[0]
+    const bands = colors.map((c, i) => `${c} ${i / colors.length * 100}% ${(i + 1) / colors.length * 100}%`)
+    return `linear-gradient(to right, ${bands.join(', ')})`
+}
+
 export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex) {
     const searchInput = document.querySelector<HTMLInputElement>('.search')!
     const directory = document.querySelector('#directory')!
@@ -81,12 +88,12 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         const pos = position(o.object)
         // The title is the entry's heading, and the label is only for the map.
         const fields = o.layer.fields.filter(f => f.key !== o.layer.titleField && f.key !== o.layer.labelField && o.object.properties[f.key] !== undefined)
-        const color = index.colors(o)[0]
+        const colors = index.colors(o)
 
         return el('details', { class: 'item' }, [
             el('summary', {}, [
                 el('div', { class: 'itemleft' }, index.title(o)),
-                el('div', { class: 'itemright', style: color && `background: ${color}` }, ' '),
+                el('div', { class: 'itemright', style: colors.length ? `background: ${swatch(colors)}` : undefined }, ' '),
             ]),
             el('div', { class: 'itemcontent' }, [
                 pos && el('div', { class: 'coords' }, `${pos[0]}, ${pos[1]}`),
