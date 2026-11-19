@@ -18,9 +18,10 @@
     "zod": "^4.6.7"
   },
   "scripts": {
-    "build": "esbuild main.js --bundle --format=esm --outdir=dist",
-    "dev": "esbuild main.js --bundle --format=esm --outdir=dist --servedir=.",
+    "build": "node scripts/build-layers.ts && esbuild main.js --bundle --format=esm --outdir=dist",
+    "dev": "node scripts/build-layers.ts && esbuild main.js --bundle --format=esm --outdir=dist --servedir=.",
     "lint": "eslint . && tsc",
-    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'"
+    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'",
+    "import": "node scripts/import-sheets.ts"
   }
 }

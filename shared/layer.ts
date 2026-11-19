@@ -121,7 +121,7 @@ export function idPrefixFor(geometry: Geometry | null): IdPrefix {
 const FIELD_VALUES: Record<FieldType, z.ZodType> = {
     text: z.string().min(1),
     url: z.url({ protocol: /^https?$/ }),
-    color: z.string().regex(/^#[0-9a-f]{6}$/i, 'Expected a color like "#ff3f3f"'),
+    color: z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"'),
     flag: z.boolean(),
     reference: z.union([objectId, z.array(objectId).min(1)]),
 }
