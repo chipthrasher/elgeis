@@ -1,7 +1,6 @@
 // Entry point
 
 import L from 'leaflet'
-import { loadConfig, showConfig } from './config.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
@@ -28,9 +27,9 @@ function saveLayers(layers: MapLayer[], shown: MapLayer[]) {
 const PAUSED = ['nether']
 
 async function main() {
-    const [config, allLayers] = await Promise.all([loadConfig(), loadLayers()])
+    const allLayers = await loadLayers()
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
-    const map = createMap(config.mapSize ?? 5500)
+    const map = createMap()
     addPanes(map)
 
     for (const l of initialLayers(layers)) l.group.addTo(map)
@@ -42,7 +41,6 @@ async function main() {
     colorPolygons(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.label(o))
     createSidebar(map, layers, index)
-    showConfig(config)
 }
 
 main()

@@ -9,17 +9,20 @@ import { el } from './dom.ts'
 // Leaflet's Simple CRS puts north (negative z) up when lat = -z.
 export const toLatLng = (x: number, z: number) => L.latLng(-z, x)
 
-export function createMap(mapSize: number): L.Map {
+// Distance from (0, 0) to the world border in the Overworld.
+const MAP_SIZE = 5500
+
+export function createMap(): L.Map {
     const map = L.map('layers', {
         crs: L.CRS.Simple,
         zoom: -3,
         minZoom: -4,
         maxZoom: 0,
-        maxBounds: [[-3 * mapSize, -3 * mapSize], [3 * mapSize, 3 * mapSize]],
+        maxBounds: [[-3 * MAP_SIZE, -3 * MAP_SIZE], [3 * MAP_SIZE, 3 * MAP_SIZE]],
         center: [0, 0],
     })
 
-    L.imageOverlay('political.jpg', [[-mapSize, -mapSize], [mapSize, mapSize]], { className: 'political-image', pane: 'tilePane' }).addTo(map)
+    L.imageOverlay('political.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'political-image', pane: 'tilePane' }).addTo(map)
 
     // Coordinate readout (top-left), updated as the mouse moves.
     const readout = L.DomUtil.create('div', 'leaflet-control-coordinates')
