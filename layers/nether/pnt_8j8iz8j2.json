@@ -1,0 +1,24 @@
+{
+  "type": "Feature",
+  "id": "pnt_8j8iz8j2",
+  "properties": {
+    "entities": ["Montrose"],
+    "name": "Bingus Province"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-191, -346]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-191, -346],
+          [-200, -346]
+        ]
+      }
+    ]
+  }
+}

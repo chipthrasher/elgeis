@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_3rsdr2bh",
+  "properties": {
+    "entities": ["Naador"],
+    "name": "Oberos",
+    "wiki": "https://wiki.elgeis.com/wiki/Drift"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [209, -93]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [209, -93],
+          [209, -100]
+        ]
+      }
+    ]
+  }
+}

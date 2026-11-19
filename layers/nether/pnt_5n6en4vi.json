@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_5n6en4vi",
+  "properties": {
+    "description": "CloudyCola's oil rig",
+    "entities": ["Montrose"],
+    "name": "Jericho"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-151, 219]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-151, 219],
+          [-151, 200]
+        ]
+      }
+    ]
+  }
+}

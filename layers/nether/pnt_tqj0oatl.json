@@ -1,0 +1,26 @@
+{
+  "type": "Feature",
+  "id": "pnt_tqj0oatl",
+  "properties": {
+    "description": "They aren't compensating for anything",
+    "entities": ["Montrose"],
+    "name": "Phildor",
+    "wiki": "https://wiki.elgeis.com/wiki/Kaab"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-346, -33]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-346, -33],
+          [-346, 0]
+        ]
+      }
+    ]
+  }
+}

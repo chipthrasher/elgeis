@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_ugqvso3n",
+  "properties": {
+    "entities": ["Emeraldia"],
+    "name": "Saikyo",
+    "wiki": "https://wiki.elgeis.com/wiki/Saikyo"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-407, 416]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-407, 416],
+          [-400, 416]
+        ]
+      }
+    ]
+  }
+}

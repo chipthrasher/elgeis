@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_8nwn9u8j",
+  "properties": {
+    "entities": ["Montrose"],
+    "name": "Marisholm Geode",
+    "wiki": "https://wiki.elgeis.com/wiki/Marisholm"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-108, 397]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-108, 397],
+          [-108, 400]
+        ]
+      }
+    ]
+  }
+}

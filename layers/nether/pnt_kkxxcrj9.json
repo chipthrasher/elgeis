@@ -1,0 +1,26 @@
+{
+  "type": "Feature",
+  "id": "pnt_kkxxcrj9",
+  "properties": {
+    "description": "The Montrosian estate of Redlet Estate",
+    "entities": ["Montrose"],
+    "line": "lin_1prxd3e2",
+    "name": "Redlet Estate"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-166, -138]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-166, -138],
+          [-166, -100]
+        ]
+      }
+    ]
+  }
+}

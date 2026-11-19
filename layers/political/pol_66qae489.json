@@ -1,0 +1,24 @@
+{
+  "type": "Feature",
+  "id": "pol_66qae489",
+  "properties": {
+    "name": "Banapo",
+    "label": "",
+    "entities": ["Banapo"],
+    "notes": ""
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [644, 2302],
+        [640, 2306],
+        [640, 2360],
+        [699, 2362],
+        [701, 2306],
+        [697, 2302],
+        [644, 2302]
+      ]
+    ]
+  }
+}

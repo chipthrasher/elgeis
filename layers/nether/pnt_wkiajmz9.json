@@ -1,0 +1,14 @@
+{
+  "type": "Feature",
+  "id": "pnt_wkiajmz9",
+  "properties": {
+    "description": "Residence of MilkedCat1225",
+    "entities": ["Yarutolu"],
+    "line": "lin_mjerrrul",
+    "name": "LaitChat"
+  },
+  "geometry": {
+    "type": "Point",
+    "coordinates": [381, 431]
+  }
+}

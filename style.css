@@ -1,5 +1,5 @@
-@import url('assets/leaflet/leaflet.css');
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap');
 
 :root {
   /* Dark mode */
@@ -29,12 +29,15 @@
   --col-innerlines: var(--col-lighter);
   --col-circles: var(--col-lightest);
 
-  --opacity-political: 0.4;
+  --opacity-dynmap: 0.7;      /* the base map image */
+  --opacity-polygons: 0.5;    /* political region fills */
+  --opacity-polygons-hover: 0.5;
+
   --line-width: 0.12rem;
-  --circle-width: 0.28rem;
   --box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
   --box-shadow-dark: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.4);
 
+  --font-serif: "Fraunces", serif;
   --font-sans: "Roboto", sans-serif;
   --font-mono: "Roboto Mono", monospace;
 }
@@ -149,25 +152,34 @@ a {
 
 /* Directory */
 
+#directory h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+  color: var(--col-light);
+  margin: 1.5rem 1.8rem 0.5rem;
+}
+
 .item {
   font-size: 1rem;
   font-weight: 500;
   margin: 0.4rem;
 }
 
-.itemtop {
+.item summary {
   cursor: pointer;
-  background: var(--darker);
   display: flex;
+  list-style: none;
   transition: 0.2s all;
   border-radius: 0.5rem;
 }
 
-.itemtop:hover {
-  background: var(--col-dark);
+.item summary::-webkit-details-marker {
+  display: none;
 }
 
-.itemtopHover {
+.item summary:hover,
+.item summary.hover {
   background: var(--col-dark);
 }
 
@@ -184,43 +196,36 @@ a {
 
 .itemcontent {
   padding: 1rem 2rem;
-  display: none;
 }
 
-.itemcontent .name {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.itemcontent .entity {
-  font-size: 1rem;
+.itemcontent .reference {
   font-style: italic;
   color: #aaa;
-  font-weight: 500;
-
   margin-bottom: 0.75rem;
+}
+
+.itemcontent .reference span {
   cursor: pointer;
   transition: 0.2s all;
 }
 
-.itemcontent .entity:hover {
+.itemcontent .reference span + span::before {
+  content: " / ";
+}
+
+.itemcontent .reference span:hover {
   color: var(--col-lightest);
 }
 
-.itemcontent .wiki {
+.itemcontent .link {
   display: block;
-  font-size: 1rem;
   font-style: italic;
-  font-weight: 500;
-
   color: var(--col-light);
-
   padding-bottom: 1rem;
-  text-decoration: none;
   transition: 0.2s all;
 }
 
-.itemcontent .wiki:hover {
+.itemcontent .link:hover {
   color: var(--col-lightest);
 }
 
@@ -232,40 +237,37 @@ a {
   margin-bottom: 0.75rem;
 }
 
-.itemcontent .description {
+.itemcontent .text {
   font-size: 0.9rem;
   margin: 1rem 0;
   font-weight: 400;
 }
 
-.itemcontent span {
-  font-size: 1.25rem;
-  transition: 0.2s all;
-  display: inline;
+.itemcontent .icon {
+  display: inline-block;
   margin-right: 0.75rem;
   color: var(--col-light);
+  transition: 0.2s all;
 }
 
-.ibwh,
-.nation,
-.end,
-.warning {
-  display: none;
+.itemcontent .icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
-.ibwh:hover {
+.icon-book:hover {
   color: var(--col-pastel-blue);
 }
 
-.nation:hover {
+.icon-flag:hover {
   color: var(--col-pastel-green);
 }
 
-.end:hover {
+.icon-aperture:hover {
   color: var(--col-pastel-purple);
 }
 
-.warning:hover {
+.icon-alert:hover {
   color: var(--col-pastel-red);
 }
 
@@ -279,66 +281,99 @@ a {
   z-index: 1;
 }
 
-.political {
-  z-index: 0;
-  opacity: var(--opacity-political);
+.dynmap {
+  opacity: var(--opacity-dynmap);
 }
 
-/* SVG Styling */
+/* Map objects */
 
-.circle {
-  transition: 0.2s all;
-  stroke: transparent;
-  r: var(--circle-width);
-  fill: var(--col-circles);
-  z-index: 10;
+.point {
+  border-radius: 50%;
+  background: var(--col-circles);
+  transition: 0.2s box-shadow;
 }
 
-.circle-national-ring {
-  r: var(--circle-width);
-  fill: transparent;
-  stroke: var(--col-circles);
-  stroke-width: 0.1rem;
-  pointer-events: all;
-  transition: 0.2s all;
-}
-
-.circle-national {
-  r: calc(var(--circle-width) * 0.5);
-  fill: var(--col-circles);
-  transition: 0.2s all;
-}
-
-.hoveredCircle {
-  stroke: white;
-  stroke-width: 0.4rem;
-  fill: var(--col-circles);
-}
-
-g.hoveredCircle .circle-national-ring {
-  stroke: white;
-  stroke-width: 0.4rem;
+/* A ring around a dot, e.g. national exits */
+.point.ring {
+  box-sizing: border-box;
+  border: 1.5px solid var(--col-circles);
+  padding: 2px;
+  background-clip: content-box;
 }
 
 .line {
-  z-index: 9;
-  stroke-width: var(--line-width);
   stroke: var(--col-lines);
+  stroke-width: 2px;
   stroke-linecap: square;
-  opacity: 0.5;
+  stroke-opacity: 0.5;
 }
 
-g[role="lines"] {}
+.polygon {
+  stroke-width: 1.5px;
+  fill-opacity: var(--opacity-polygons);
+}
 
-g[role="portals"] g {}
+.point.highlight {
+  box-shadow: 0 0 0 3px white;
+}
 
-.hidden {
-  opacity: 0;
+.line.highlight {
+  stroke: white;
+  stroke-opacity: 1;
+}
+
+.polygon.highlight {
+  fill-opacity: var(--opacity-polygons-hover);
+}
+
+/* Names inside polygons. The span is centered on the icon, which Leaflet
+   centers on the label's point. */
+.polygon-label span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--col-lightest);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.7), 0 0 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.polygon-label span.crowded {
+  visibility: hidden;
+}
+
+.polygon-label.unmatched {
+  opacity: 0.3;
+}
+
+/* Clicking an object focuses it; don't draw the browser's focus box. */
+.leaflet-interactive:focus {
+  outline: none;
+}
+
+/* Objects that don't match the search. Polygons stay as context. */
+.point.unmatched,
+.line.unmatched {
   display: none;
 }
 
-.line[role="inner"] {
-  stroke: var(--col-innerlines);
+.polygon.unmatched {
+  opacity: 0.3;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Holds the hatch patterns for disputed polygons */
+.patterns {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .leaflet-control {
@@ -349,8 +384,9 @@ g[role="portals"] g {}
   padding: 0.6rem;
 }
 
-/* Tooltip */
+/* Tooltips: tippy for icons, Leaflet's for map objects */
 
+.leaflet-tooltip,
 [data-tippy-root] {
   box-shadow: var(--box-shadow-dark);
   font-family: inherit;
@@ -369,11 +405,16 @@ g[role="portals"] g {}
   background: inherit;
 }
 
+.leaflet-tooltip::before {
+  display: none;
+}
+
+.leaflet-tooltip .name,
 [data-tippy-root] .name {
   font-weight: 500;
 }
 
-[data-tippy-root] .coords {
+.leaflet-tooltip .coords {
   font-family: var(--font-sans);
   color: var(--col-light);
   font-weight: 500;
@@ -391,10 +432,6 @@ g[role="portals"] g {}
 
 .mono {
   font-family: var(--font-mono);
-}
-
-.leaflet-control-coordinates.hidden {
-  display: none;
 }
 
 .leaflet-control-coordinates strong {}

@@ -1,0 +1,24 @@
+{
+  "type": "Feature",
+  "id": "pnt_idth3pz5",
+  "properties": {
+    "entities": ["Wohlstand"],
+    "name": "Cjeni"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [21, -276]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [21, -276],
+          [0, -276]
+        ]
+      }
+    ]
+  }
+}

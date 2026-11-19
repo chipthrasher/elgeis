@@ -1,0 +1,24 @@
+{
+  "type": "Feature",
+  "id": "pnt_nufs6pi1",
+  "properties": {
+    "entities": ["Montrose"],
+    "name": "Montrosian Prismarine Farm"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-96, 222]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-96, 222],
+          [-100, 222]
+        ]
+      }
+    ]
+  }
+}

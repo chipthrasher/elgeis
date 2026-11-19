@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_ijjox6g4",
+  "properties": {
+    "description": "The estate of knightofkessler.",
+    "entities": ["Montrose"],
+    "name": "Leh'o*hraq* Nenniur"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [-250, -125]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [-250, -125],
+          [-250, -100]
+        ]
+      }
+    ]
+  }
+}

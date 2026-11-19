@@ -1,0 +1,25 @@
+{
+  "type": "Feature",
+  "id": "pnt_uymeygwd",
+  "properties": {
+    "description": "Formerly the UAC capital",
+    "entities": ["Šarakofu"],
+    "name": "Alliance City"
+  },
+  "geometry": {
+    "type": "GeometryCollection",
+    "geometries": [
+      {
+        "type": "Point",
+        "coordinates": [218, -253]
+      },
+      {
+        "type": "LineString",
+        "coordinates": [
+          [218, -253],
+          [200, -253]
+        ]
+      }
+    ]
+  }
+}

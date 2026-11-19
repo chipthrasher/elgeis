@@ -1,0 +1,42 @@
+{
+  "id": "political",
+  "dimension": "overworld",
+  "fields": [
+    {
+      "type": "text",
+      "key": "name",
+      "label": "Name",
+      "description": "A nation's name, or a polygon's name in the directory"
+    },
+    {
+      "type": "text",
+      "key": "label",
+      "label": "Map label",
+      "description": "Drawn on the map instead of the polygon's political entities"
+    },
+    {
+      "type": "color",
+      "key": "color",
+      "label": "Color"
+    },
+    {
+      "type": "entities",
+      "key": "entities",
+      "label": "Political entities"
+    },
+    {
+      "type": "url",
+      "key": "wiki",
+      "label": "Wiki"
+    },
+    {
+      "type": "text",
+      "key": "notes",
+      "label": "Notes"
+    }
+  ],
+  "name": "Political Map",
+  "official": true,
+  "titleField": "name",
+  "labelField": "label"
+}
