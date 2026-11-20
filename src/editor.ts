@@ -166,19 +166,48 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     function fieldInput(field: Field, value: PropertyValue | undefined, original: PropertyValue | undefined) {
         const id = `field-${field.key}`
         const input = el('input', { id, value: typeof value === 'string' ? value : '' })
-        // Entities and references are typed by name, comma-separated, and
-        // stored by ID. A single reference stays a string.
+        // Entities and references are picked by name, any number of them (a
+        // contested area has several entities), and stored by ID. A single
+        // reference stays a string.
         const linked = () => {
-            input.value = names.format(field, value)
-            input.placeholder = 'Names, separated by commas'
+            const ids = typeof value === 'string' ? [value] : Array.isArray(value) ? [...value] : []
+            const chosen = el('div', { class: 'chips' })
+            const render = () => chosen.replaceChildren(...ids.map((linkedId, i) => {
+                const remove = button('×', () => { ids.splice(i, 1); render() }, 'link')
+                remove.title = 'Remove'
+                return el('span', { class: 'chip' }, [names.format(field, linkedId), remove])
+            }))
+            render()
+
+            const options = names.options(field)
+            input.value = ''
+            input.placeholder = ids.length ? 'Add another' : 'Pick a name'
             input.setAttribute('list', id + '-list')
-            const datalist = el('datalist', { id: id + '-list' }, names.options(field).map(option => el('option', { value: option })))
-            const read = () => {
-                const ids = names.parse(field, input.value)
-                if (ids.length === 0) return undefined
-                return field.type === 'reference' && ids.length === 1 && !Array.isArray(original) ? ids[0] : ids
+            const datalist = el('datalist', { id: id + '-list' }, options.map(option => el('option', { value: option })))
+            // Move what's in the box into the list. Throws if it isn't a name.
+            const add = () => {
+                for (const linkedId of names.parse(field, input.value)) if (!ids.includes(linkedId)) ids.push(linkedId)
+                input.value = ''
+                input.placeholder = 'Add another'
+                render()
             }
-            return { node: labelled(field, input, datalist), read }
+            // Picking a suggestion adds it right away; Enter adds what's typed.
+            input.addEventListener('input', () => {
+                input.setCustomValidity('')
+                if (options.includes(input.value)) add()
+            })
+            input.addEventListener('keydown', e => {
+                if (e.key !== 'Enter') return
+                e.preventDefault()
+                try { add() } catch (err) { input.setCustomValidity((err as Error).message); input.reportValidity() }
+            })
+
+            const read = () => {
+                add()
+                if (ids.length === 0) return undefined
+                return field.type === 'reference' && ids.length === 1 && !Array.isArray(original) ? ids[0] : [...ids]
+            }
+            return { node: labelled(field, input, datalist, chosen), read }
         }
 
         switch (field.type) {
