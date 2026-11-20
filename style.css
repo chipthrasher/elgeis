@@ -353,6 +353,26 @@ a {
   flex-wrap: nowrap;
 }
 
+.panel .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.panel .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--col-light);
+  border-radius: 1rem;
+}
+
+.panel .chip .link {
+  text-decoration: none;
+}
+
 .panel .check {
   display: block;
   margin: 0.5rem 0;
