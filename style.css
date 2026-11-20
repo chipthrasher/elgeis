@@ -63,15 +63,13 @@ a {
   color: inherit;
 }
 
-#left {
-  top: 0;
-  left: 0;
+#map {
   width: 100vw;
   height: 100vh;
   z-index: 7;
 }
 
-#right {
+#sidebar {
   z-index: 8;
 
   background: var(--col-darker);
@@ -79,9 +77,6 @@ a {
   box-shadow: var(--box-shadow);
   height: 100vh;
   overflow: scroll;
-
-  right: 0;
-  top: 0;
   width: 27.5rem;
 }
 
