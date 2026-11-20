@@ -141,7 +141,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         search.addEventListener('input', list)
 
         const current = draft?.layerId === layerId ? draft : null
-        show('Contribute',
+        show('Update the map',
             el('label', {}, ['Layer ', select]),
             el('p', { class: 'muted' }, 'Click something on the map, or find it here, to change it. Hidden things are listed too.'),
             search, results,
@@ -407,7 +407,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         show('Your change requests',
             el('p', { class: 'muted' }, `${open} of ${MAX_OPEN_REQUESTS} open.`),
             requestList(mine, "You haven't suggested any changes yet."),
-            button('Contribute', () => home(), 'primary'),
+            button('Update the map', () => home(), 'primary'),
         )
     }
 
