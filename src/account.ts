@@ -62,7 +62,7 @@ export async function createAccount(box: HTMLElement) {
     }
 
     function signedOut() {
-        show(linkButton('Sign in', askEmail), ' to suggest changes to the map')
+        show(linkButton('Sign in', () => askEmail()), ' to suggest changes to the map')
     }
 
     function askEmail(problem = '') {

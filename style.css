@@ -147,11 +147,20 @@ a {
 
 /* Account */
 
+/* A box over the map, top right */
 .account {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9;
+  max-width: 22rem;
+  padding: 0.6rem 1rem;
+  background: var(--col-darker);
+  border-radius: 0.3rem;
+  box-shadow: var(--box-shadow);
   text-align: center;
   color: var(--col-light);
   font-size: 0.9rem;
-  margin: -2rem 0 1rem;
 }
 
 .account:empty {

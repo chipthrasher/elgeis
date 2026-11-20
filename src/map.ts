@@ -20,6 +20,7 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
         maxZoom: 0,
         maxBounds: [[-3 * MAP_SIZE, -3 * MAP_SIZE], [3 * MAP_SIZE, 3 * MAP_SIZE]],
         center: [0, 0],
+        attributionControl: false,
     })
 
     // A render of the world from the server's dynmap, drawn beneath every layer.
