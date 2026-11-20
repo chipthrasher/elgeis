@@ -2,28 +2,22 @@
 // email, open the link we send them, and pick a username the first time.
 // Nothing shows when there's no backend.
 
+import { api } from './api.ts'
 import { el } from './dom.ts'
 import { getParam, setParam } from './url.ts'
 
-interface User {
+export interface User {
     username: string | null
     displayUsername: string | null
+    role?: string | null
 }
 
-async function call(path: string, body?: object) {
-    const response = await fetch('/api/auth/' + path, body && {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-    })
-    const json = await response.json().catch(() => null)
-    if (!response.ok) throw new Error(json?.message ?? `Something went wrong (${response.status})`)
-    return json
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const call = (path: string, body?: object) => api<any>('auth/' + path, body)
 
 const getUser = async (): Promise<User | null> => (await call('get-session'))?.user ?? null
 
-const linkButton = (text: string, onClick: () => void) => {
+export const linkButton = (text: string, onClick: () => void) => {
     const button = el('button', { type: 'button', class: 'link' }, text)
     button.addEventListener('click', onClick)
     return button
@@ -49,7 +43,8 @@ function form(input: HTMLInputElement, label: string, onSubmit: (value: string) 
     return node
 }
 
-export async function createAccount(box: HTMLElement) {
+// `links` are shown once someone's signed in and has a username, e.g. to the editor.
+export async function createAccount(box: HTMLElement, links: (user: User) => Promise<Node[]>) {
     let user: User | null
     try {
         user = await getUser()
@@ -83,9 +78,11 @@ export async function createAccount(box: HTMLElement) {
         }), linkButton('Sign out', signOut))
     }
 
-    function signedIn() {
+    async function signedIn() {
         if (!user?.username) return askUsername()
-        show('Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ', linkButton('Sign out', signOut))
+        const extra = await links(user).catch(() => [])
+        show('Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ', linkButton('Sign out', signOut),
+            ...extra.length ? [el('div', { class: 'links' }, extra)] : [])
     }
 
     async function signOut() {

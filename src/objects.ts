@@ -24,6 +24,15 @@ export class ObjectIndex {
         }
     }
 
+    get(id: string): MapObject | undefined {
+        return this.byId.get(id)
+    }
+
+    // Every entity name, for suggestions in the editor.
+    entityNames(): string[] {
+        return [...this.byEntityName.keys()].sort()
+    }
+
     // The objects this one points to: by ID through its reference fields, and
     // by name through its entities fields.
     references(o: MapObject): MapObject[] {

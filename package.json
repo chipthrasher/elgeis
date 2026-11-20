@@ -19,6 +19,7 @@
     "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
+    "@geoman-io/leaflet-geoman-free": "^2.20.6",
     "@hono/node-server": "^2.1.9",
     "better-auth": "^1.7.26",
     "hono": "^4.13.19",
