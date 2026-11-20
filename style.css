@@ -356,21 +356,30 @@ a {
 .panel .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
 }
 
 .panel .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.1rem 0.5rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+  background: var(--col-dark);
   border: 1px solid var(--col-light);
-  border-radius: 1rem;
+  border-radius: 0.4rem;
 }
 
 .panel .chip .link {
+  padding: 0 0.3rem;
+  border-radius: 0.25rem;
   text-decoration: none;
+  color: var(--col-light);
+}
+
+.panel .chip .link:hover {
+  color: var(--col-lightest);
+  background: var(--col-darker);
 }
 
 .panel .check {
