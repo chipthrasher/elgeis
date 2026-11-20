@@ -442,10 +442,6 @@ a {
   height: 0;
 }
 
-.leaflet-control {
-  box-shadow: var(--box-shadow);
-}
-
 /* Tooltips: tippy for icons, Leaflet's for map objects */
 
 .leaflet-tooltip,
@@ -482,19 +478,49 @@ a {
   font-weight: 500;
 }
 
-/* Boxes over the map: the coordinates and today's date. The extra class beats
-   Leaflet's blue link color. */
+/* Leaflet's controls, in dark boxes like the tooltips. The extra
+   .leaflet-container beats Leaflet's own colors, borders, and shadows. */
 
-.leaflet-container .map-box {
-  padding: 0.6rem;
+.leaflet-container .leaflet-control {
   background: var(--col-darker);
-  border-radius: 0.3rem;
   color: var(--col-lightest);
+  border: none;
+  border-radius: 0.3rem;
+  box-shadow: var(--box-shadow);
+}
+
+/* The coordinates, today's date, and the layer list */
+.leaflet-container .map-box,
+.leaflet-container .leaflet-control-layers-expanded {
+  padding: 0.6rem;
   line-height: 1.5rem;
+  cursor: pointer;
 }
 
 .leaflet-container a.map-box:hover {
   color: var(--col-lighter);
+}
+
+/* Dark checkboxes */
+.leaflet-control-layers {
+  color-scheme: dark;
+}
+
+/* Zoom buttons */
+.leaflet-container .leaflet-bar a {
+  background: var(--col-darker);
+  color: var(--col-lightest);
+  border-bottom-color: var(--col-dark);
+}
+
+.leaflet-container .leaflet-bar a:hover,
+.leaflet-container .leaflet-bar a:focus {
+  background: var(--col-dark);
+}
+
+.leaflet-container .leaflet-bar a.leaflet-disabled {
+  background: var(--col-darker);
+  color: var(--col-light);
 }
 
 .leaflet-control-coordinates {
@@ -506,8 +532,3 @@ a {
 }
 
 .leaflet-control-coordinates strong {}
-
-.leaflet-control-coordinates,
-.leaflet-control-zoom {
-  box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
-}
