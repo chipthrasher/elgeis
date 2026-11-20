@@ -446,10 +446,6 @@ a {
   box-shadow: var(--box-shadow);
 }
 
-.leaflet-control-coordinates {
-  padding: 0.6rem;
-}
-
 /* Tooltips: tippy for icons, Leaflet's for map objects */
 
 .leaflet-tooltip,
@@ -486,14 +482,23 @@ a {
   font-weight: 500;
 }
 
-/* Coordinates */
+/* Boxes over the map: the coordinates and today's date. The extra class beats
+   Leaflet's blue link color. */
 
-.leaflet-control-coordinates {
+.leaflet-container .map-box {
+  padding: 0.6rem;
   background: var(--col-darker);
   border-radius: 0.3rem;
-  cursor: pointer;
   color: var(--col-lightest);
   line-height: 1.5rem;
+}
+
+.leaflet-container a.map-box:hover {
+  color: var(--col-lighter);
+}
+
+.leaflet-control-coordinates {
+  cursor: pointer;
 }
 
 .mono {
