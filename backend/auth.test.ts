@@ -1,47 +1,19 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { getMigrations } from 'better-auth/db/migration'
-import { createAuth } from './auth.ts'
-import { createApp } from './main.ts'
 import { seed } from './seed.ts'
-import { skip, testDb } from './test-db.ts'
-
-const SITE = 'http://map.test'
-
-async function setup() {
-    const db = await testDb()
-    const mail: { to: string, text: string }[] = []
-    const auth = createAuth(db, {
-        siteUrl: SITE,
-        secret: 'test-secret-that-is-long-enough-to-use',
-        sendMail: async (to, _subject, text) => { mail.push({ to, text }) },
-    })
-    const app = createApp(auth)
-
-    // A tiny browser: keeps cookies and sends the site's Origin.
-    let cookie = ''
-    async function request(path: string, body?: object) {
-        const response = await app.request(SITE + path, {
-            method: body ? 'POST' : 'GET',
-            headers: { cookie, origin: SITE, 'content-type': 'application/json' },
-            body: body && JSON.stringify(body),
-            redirect: 'manual',
-        })
-        const set = response.headers.getSetCookie().map(c => c.split(';')[0])
-        if (set.length) cookie = set.join('; ')
-        return response
-    }
-    return { db, auth, mail, request }
-}
+import { SITE, testApp } from './test-app.ts'
+import { skip } from './test-db.ts'
 
 test("migrations create everything Better Auth's plugins need", { skip }, async () => {
-    const { auth } = await setup()
+    const { auth } = await testApp()
     const { toBeCreated, toBeAdded } = await getMigrations(auth.options)
     assert.deepEqual([...toBeCreated, ...toBeAdded], [])
 })
 
 test('sign in with an email link, pick a username, and sign out', { skip }, async () => {
-    const { mail, request } = await setup()
+    const { mail, browser } = await testApp()
+    const request = browser()
     assert.equal(await (await request('/api/auth/get-session')).json(), null)
 
     const sent = await request('/api/auth/sign-in/magic-link', { email: 'steve@example.com', callbackURL: '/?q=x' })
@@ -74,13 +46,11 @@ test('sign in with an email link, pick a username, and sign out', { skip }, asyn
 })
 
 test('seeded users can sign in, and the admin is a site admin', { skip }, async () => {
-    const { db, mail, request } = await setup()
+    const { db, signIn } = await testApp()
     await seed(db)
     await seed(db) // again, harmlessly
 
-    await request('/api/auth/sign-in/magic-link', { email: 'admin@example.com' })
-    const link = new URL(mail[0].text.match(/http\S+/)![0])
-    await request(link.pathname + link.search)
+    const request = await signIn('admin@example.com')
     const session = await (await request('/api/auth/get-session')).json()
     assert.equal(session.user.username, 'admin')
     assert.equal(session.user.role, 'admin')

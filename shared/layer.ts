@@ -1,6 +1,6 @@
 // Types and validation for layers and the objects in them. Shared by the build
-// scripts, the browser, and (later) the backend, so they all agree on what
-// valid layer data is.
+// scripts, the browser, and the backend, so they all agree on what valid layer
+// data is.
 
 import { z } from 'zod'
 
@@ -21,7 +21,7 @@ export function newId(prefix: IdPrefix): string {
     return prefix + '_' + Array.from(bytes, b => ID_ALPHABET[b % ID_ALPHABET.length]).join('')
 }
 
-const objectId = z.string().regex(/^(pnt|lin|pol|ent)_[0-9a-z]+$/, 'Expected an object ID like "pol_8f3k2a9x"')
+export const ObjectId = z.string().regex(/^(pnt|lin|pol|ent)_[0-9a-z]+$/, 'Expected an object ID like "pol_8f3k2a9x"')
 
 // Official layers have readable IDs ("nether"); community layers get `lay_` IDs.
 export const LayerId = z.string().regex(/^([a-z]+|lay_[0-9a-z]+)$/, 'Expected a layer ID like "nether" or "lay_3k9x2m7q"')
@@ -130,7 +130,7 @@ const FIELD_VALUES: Record<FieldType, z.ZodType> = {
     url: z.url({ protocol: /^https?$/ }),
     color: z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"'),
     flag: z.boolean(),
-    reference: z.union([objectId, z.array(objectId).min(1)]),
+    reference: z.union([ObjectId, z.array(ObjectId).min(1)]),
     entities: z.array(z.string().min(1)).min(1),
 }
 
@@ -156,7 +156,7 @@ export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
 
     return z.object({
         type: z.literal('Feature'),
-        id: objectId,
+        id: ObjectId,
         geometry: Geometry.nullable(),
         properties: z.object(properties).strict(),
     }).strict().refine(
@@ -177,3 +177,47 @@ export function valuesOf(layer: Layer, object: LayerObject, type: FieldType): st
 // An entity's name, which entities fields refer to it by.
 export const entityName = (layer: Layer, object: LayerObject) =>
     object.id.startsWith('ent_') ? object.properties[layer.titleField] as string | undefined : undefined
+
+// --- Whole layers ----------------------------------------------------------------
+
+export interface LayerData {
+    layer: Layer
+    objects: LayerObject[]
+}
+
+export interface ObjectProblem {
+    layerId: string
+    objectId: string
+    message: string
+}
+
+// Checks across layers, on objects that are each valid on their own: IDs and
+// entity names are unique across all layers, and references (by ID or entity
+// name) point at objects that exist, in any layer.
+export function checkLayers(layers: LayerData[]): ObjectProblem[] {
+    const problems: ObjectProblem[] = []
+    const ids = new Set<string>()
+    const names = new Set<string>()
+    for (const { layer, objects } of layers) {
+        for (const object of objects) {
+            const fail = (message: string) => problems.push({ layerId: layer.id, objectId: object.id, message })
+            if (ids.has(object.id)) fail('Duplicate ID')
+            ids.add(object.id)
+            const name = entityName(layer, object)
+            if (name && names.has(name)) fail(`Duplicate entity name "${name}"`)
+            if (name) names.add(name)
+        }
+    }
+    for (const { layer, objects } of layers) {
+        for (const object of objects) {
+            const fail = (message: string) => problems.push({ layerId: layer.id, objectId: object.id, message })
+            for (const ref of valuesOf(layer, object, 'reference')) {
+                if (!ids.has(ref)) fail(`References missing object "${ref}"`)
+            }
+            for (const name of valuesOf(layer, object, 'entities')) {
+                if (!names.has(name)) fail(`Lists missing entity "${name}"`)
+            }
+        }
+    }
+    return problems
+}
