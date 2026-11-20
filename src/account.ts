@@ -1,6 +1,6 @@
 // Signing in and out, through the backend's auth API. People enter their
 // email, open the link we send them, and pick a username the first time.
-// Nothing shows when there's no backend, like under `npm run dev`.
+// Nothing shows when there's no backend.
 
 import { el } from './dom.ts'
 import { getParam, setParam } from './url.ts'

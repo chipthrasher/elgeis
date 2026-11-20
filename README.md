@@ -2,22 +2,7 @@
 
 ## Developing
 
-You need Node 22.18 or newer (see `.nvmrc`).
-
-```sh
-npm install
-npm run dev    # serve the map at http://localhost:8000
-npm run lint   # ESLint and TypeScript
-npm test
-```
-
-Database tests are skipped unless `DATABASE_URL` points at a Postgres server where they can create throwaway databases, e.g. `DATABASE_URL=postgres://postgres:test@localhost:5432/postgres npm test`. Migrations live in `backend/migrations/` and run when the backend starts; `node backend/migrate.ts down` undoes the last one.
-
-Map data lives in its own repo, [chipthrasher/elgeisdata](https://github.com/chipthrasher/elgeisdata): a folder per layer, each with a `layer.json` manifest plus one GeoJSON file per object. `npm run build` and `npm run dev` clone or update it into `data/layers` (or run `npm run layers` yourself). `npm run build` validates it and writes the static layer JSON and the bundled JavaScript to `dist/`, which isn't committed.
-
-### The whole site
-
-`npm run dev` only serves the map. To run everything (the backend, Postgres, and [Mailpit](http://localhost:8025) to catch email), you need Docker:
+The site runs in Docker. To start it (the frontend, the backend, Postgres, and [Mailpit](http://localhost:8025) to catch email):
 
 ```sh
 cp .env.example .env
@@ -35,6 +20,21 @@ docker compose exec backend node backend/seed.ts
 ```
 
 Then enter one of their emails under "Sign in" and open the link from Mailpit. Any other email works too, as a new account.
+
+Map data lives in its own repo, [chipthrasher/elgeisdata](https://github.com/chipthrasher/elgeisdata): a folder per layer, each with a `layer.json` manifest plus one GeoJSON file per object. The backend clones it on first start and builds it into the static JSON the map loads.
+
+### Checks
+
+Linting and tests run on your machine, with Node 22.18 or newer (see `.nvmrc`):
+
+```sh
+npm install
+npm run lint   # ESLint and TypeScript
+npm test
+npm run build  # bundle the frontend into dist/
+```
+
+Database tests are skipped unless `DATABASE_URL` points at a Postgres server where they can create throwaway databases, e.g. `DATABASE_URL=postgres://postgres:test@localhost:5432/postgres npm test`. Migrations live in `backend/migrations/` and run when the backend starts; `node backend/migrate.ts down` undoes the last one.
 
 ## Deploying
 

@@ -10,8 +10,8 @@
 //
 // Everything is validated first, and nothing is written if anything is invalid.
 //
-// Usage: node scripts/build-layers.ts [layers dir] [output dir]
-// The layers dir defaults to data/layers, where `npm run layers` puts them.
+// The backend runs this on the layers repo. To run it yourself:
+//   node scripts/build-layers.ts <layers dir> <output dir>
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -109,7 +109,11 @@ export function buildLayers(layersDir: string, outDir: string): LayerData[] {
 }
 
 if (import.meta.main) {
-    const [layersDir = 'data/layers', outDir = 'dist/layers'] = process.argv.slice(2)
+    const [layersDir, outDir] = process.argv.slice(2)
+    if (!layersDir || !outDir) {
+        console.error('Usage: node scripts/build-layers.ts <layers dir> <output dir>')
+        process.exit(1)
+    }
     try {
         const layers = buildLayers(layersDir, outDir)
         const count = layers.reduce((n, l) => n + l.objects.length, 0)

@@ -20,7 +20,7 @@ if (import.meta.main) {
     const db = createDb(env.DATABASE_URL!)
     await migrateToLatest(db)
 
-    const layers = initLayers(env.LAYERS_REPO ?? 'data/layers', env.LAYERS_BUILD ?? 'dist/layers', env.LAYERS_REMOTE!)
+    const layers = initLayers(env.LAYERS_REPO!, env.LAYERS_BUILD!, env.LAYERS_REMOTE!)
     // Every layer in the repo gets a row, for its admins and change requests.
     if (layers.length) await db.insertInto('layer').values(layers.map(l => ({ id: l.layer.id }))).onConflict(c => c.doNothing()).execute()
 
