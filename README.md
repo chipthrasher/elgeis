@@ -11,7 +11,7 @@ docker compose -f compose.yaml -f compose.dev.yaml up --build
 
 With [Task](https://taskfile.dev) installed, `task up` starts it in the background, `task logs` follows the logs (`task logs -- backend` for one service), and `task down` stops it. Add `PROD=1` to any of them to use the production setup instead, e.g. `task up PROD=1` on the server.
 
-The site is at http://localhost:8080. The frontend rebuilds and the backend restarts when you edit files. After changing `package.json`, run the command again so the images are rebuilt.
+The site is at http://localhost:8080. When you save a frontend file, it rebuilds and open pages reload; when you save a backend file, the backend restarts. After changing `package.json`, run the command again so the images are rebuilt.
 
 To sign in, create a test site admin (`admin@example.com`) and a test regular user (`user@example.com`):
 

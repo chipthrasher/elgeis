@@ -1,19 +1,23 @@
 # Development: `docker compose -f compose.yaml -f compose.dev.yaml up --build`.
-# Serves the frontend from your checkout, rebuilds it and restarts the backend
-# when files change, and catches email in Mailpit at http://localhost:8025.
+# Serves the frontend from your checkout, rebuilds it and reloads open pages
+# when files change, restarts the backend when its files change, and catches
+# email in Mailpit at http://localhost:8025.
 
 services:
   proxy:
     volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - .:/srv/site:ro
       - frontend:/srv/dist:ro
 
   frontend:
     build: { context: ., target: deps }
-    command: npx esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --watch=forever
+    command: node scripts/dev-frontend.ts /checkout
     volumes:
       - ./src:/app/src:ro
       - ./shared:/app/shared:ro
+      - ./scripts:/app/scripts:ro
+      - .:/checkout:ro
       - frontend:/app/dist
 
   backend:

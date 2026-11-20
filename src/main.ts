@@ -59,3 +59,7 @@ async function main() {
 }
 
 main()
+
+// In development, reload when the frontend changes (see scripts/dev-frontend.ts).
+// esbuild drops this from minified production builds.
+if (process.env.NODE_ENV === 'development') new EventSource('/reload').onmessage = () => location.reload()

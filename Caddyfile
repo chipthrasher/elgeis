@@ -20,6 +20,11 @@
 		}
 	}
 
+	# Development only: tells open pages to reload when the frontend changes.
+	handle /reload {
+		reverse_proxy frontend:8000
+	}
+
 	# Built from the layers repo by the backend.
 	handle_path /dist/layers/* {
 		root * /srv/built/layers
