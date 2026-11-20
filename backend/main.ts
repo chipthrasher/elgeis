@@ -22,7 +22,7 @@ if (import.meta.main) {
 
     const layers = initLayers(env.LAYERS_REPO ?? 'data/layers', env.LAYERS_BUILD ?? 'dist/layers', env.LAYERS_REMOTE!)
     // Every layer in the repo gets a row, for its admins and change requests.
-    await db.insertInto('layer').values(layers.map(l => ({ id: l.layer.id }))).onConflict(c => c.doNothing()).execute()
+    if (layers.length) await db.insertInto('layer').values(layers.map(l => ({ id: l.layer.id }))).onConflict(c => c.doNothing()).execute()
 
     const auth = createAuth(db, {
         siteUrl: env.SITE_URL!,

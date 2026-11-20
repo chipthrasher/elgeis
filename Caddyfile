@@ -34,7 +34,8 @@
 	handle {
 		root * /srv/site
 		file_server {
-			hide .* node_modules
+			# In dev this is the whole checkout, so keep the private bits out.
+			hide .* node_modules secrets
 		}
 	}
 }

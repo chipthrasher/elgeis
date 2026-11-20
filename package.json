@@ -31,7 +31,7 @@
     "zod": "^4.6.7"
   },
   "scripts": {
-    "layers": "git -C data/layers pull --ff-only || git clone https://github.com/chipthrasher/elgeisdata.git data/layers",
+    "layers": "test -d data/layers || git clone https://github.com/chipthrasher/elgeisdata.git data/layers && (git -C data/layers pull --ff-only || echo Could not update data/layers, using it as is)",
     "build": "npm run layers && node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
     "dev": "npm run layers && node --watch-path=data/layers --watch-path=shared --watch-preserve-output scripts/build-layers.ts & esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
     "lint": "eslint . && tsc",

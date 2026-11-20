@@ -89,7 +89,11 @@ export async function createAccount(box: HTMLElement) {
     }
 
     async function signOut() {
-        await call('sign-out', {})
+        try {
+            await call('sign-out', {})
+        } catch (e) {
+            return show((e as Error).message, ' · ', linkButton('Try again', signOut))
+        }
         user = null
         signedOut()
     }
