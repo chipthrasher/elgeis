@@ -20,16 +20,7 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
         maxZoom: 0,
         maxBounds: [[-3 * MAP_SIZE, -3 * MAP_SIZE], [3 * MAP_SIZE, 3 * MAP_SIZE]],
         center: [0, 0],
-        // Added below, after the title.
-        zoomControl: false,
     })
-
-    // The title box from index.html, top left, above the zoom buttons.
-    const overlay = document.querySelector<HTMLElement>('.overlay')!
-    L.DomEvent.disableClickPropagation(overlay)
-    const Title = L.Control.extend({ onAdd: () => overlay })
-    new Title({ position: 'topleft' }).addTo(map)
-    L.control.zoom({ position: 'topleft' }).addTo(map)
 
     // A render of the world from the server's dynmap, drawn beneath every layer.
     // main.ts decides whether it shows.

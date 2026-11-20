@@ -96,45 +96,27 @@ a {
 }
 
 .top {
-  padding: 1.5rem 1.5rem 0.75rem 1.5rem;
-}
-
-/* The title box over the map, top left */
-
-.overlay {
-  /* Leaflet sets its own font and link color for its controls. */
-  font: 1rem/1.5rem var(--font-sans);
-  background: var(--col-darker);
-  color: var(--col-lightest);
-  border-radius: 0.5rem;
-  padding: 1rem 1.5rem;
-  text-align: center;
-}
-
-.overlay a {
-  color: inherit;
+  padding: 3rem 1.5rem 0.75rem 1.5rem;
 }
 
 .title {
   font-size: 2rem;
   font-weight: 900;
-  line-height: 2.5rem;
+  text-align: center;
+  margin-bottom: 1rem;
 }
 
 .info, .subtitle {
+  text-align: center;
   color: var(--col-light);
   font-weight: 500;
   font-style: italic;
+  margin-bottom: 1.75rem;
   line-height: 1.75rem;
 }
 
 .subtitle {
   font-size: 1.2rem;
-}
-
-.info {
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
 }
 
 .tiny {
@@ -174,7 +156,7 @@ a {
   text-align: center;
   color: var(--col-light);
   font-size: 0.9rem;
-  margin-bottom: 1rem;
+  margin: -2rem 0 1rem;
 }
 
 .account:empty {
