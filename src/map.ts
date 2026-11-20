@@ -17,7 +17,7 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
         crs: L.CRS.Simple,
         zoom: -3,
         minZoom: -4,
-        maxZoom: 0,
+        maxZoom: 2,
         maxBounds: [[-3 * MAP_SIZE, -3 * MAP_SIZE], [3 * MAP_SIZE, 3 * MAP_SIZE]],
         center: [0, 0],
         attributionControl: false,

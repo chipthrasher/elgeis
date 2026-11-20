@@ -46,7 +46,7 @@ async function main() {
         // Reviewers get a link to what's waiting for them.
         const waiting = await api<unknown[]>('requests?review')
         return [
-            linkButton('Suggest a change', () => editor.home()),
+            linkButton('Contribute', () => editor.home()),
             linkButton('Your changes', () => editor.myRequests()),
             (waiting.length > 0 || user.role === 'admin') && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
         ].filter((n): n is HTMLButtonElement => !!n)
