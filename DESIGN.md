@@ -53,7 +53,7 @@ To start we will likely have 2 big layers and maybe 30 community supported small
 
 Storage is split between git and Postgres:
 
-- **Git holds the approved layer data.** Each layer is a folder of GeoJSON files, one file per object, written with consistent formatting so diffs stay clean. The backend is the only thing that writes to the repo. Each approved change request becomes one commit, with the requester as author and the approving admin in the commit message. History, reverts, and backups (by pushing to a remote) come from git.
+- **Git holds the approved layer data.** Each layer is a folder of GeoJSON files, one file per object, written with consistent formatting so diffs stay clean. The backend is the only thing that writes to the repo. Each approved change request becomes one commit, with the requester as author and the approving admin in the commit message. History, reverts, and backups (by pushing to a remote) come from git. The remote is its own repo, [chipthrasher/elgeisdata](https://github.com/chipthrasher/elgeisdata), with each layer's folder at its root, so map edits don't crowd the code's history. The backend clones it on first start.
 - **Approving writes git first, then Postgres.** Approvals run one at a time, so two admins can't collide on the repo. Each commit message includes the change request ID. On startup, the backend checks recent commits against Postgres and marks any request that was committed but never marked approved, which repairs a crash between the two writes.
 - **Postgres holds everything else:** pending change requests (drafts, submitted, rejected, stale), review comments, layer admins, and app state like rate limits and the email notification queue. User accounts and sessions live there too.
 - **Past borders come from git history.** There's no time slider for now, so objects don't need dates. If we add a slider later, we'll decide then whether dates use real-world time, Elgeis lore time, or both.
@@ -94,7 +94,7 @@ The whole site runs with Docker Compose, like most self-hosted software. `docker
 
 ## Migrating off Google Sheets
 
-Done. The Sheet was imported once (portals and highway lines into the Nether layer, nations into political-layer entities, computed connectors as stored LineStrings, `Hide` rows as hidden objects), and then retired along with `cache.sh` and the import script. The political polygons were traced once from the map's Paint.NET file (the import scripts are in git history). `layers/` is now the only source of map data.
+Done. The Sheet was imported once (portals and highway lines into the Nether layer, nations into political-layer entities, computed connectors as stored LineStrings, `Hide` rows as hidden objects), and then retired along with `cache.sh` and the import script. The political polygons were traced once from the map's Paint.NET file (the import scripts are in git history). The layer data, now in its own repo, is the only source of map data.
 
 ## Random future ideas
 

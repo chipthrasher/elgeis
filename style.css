@@ -63,15 +63,13 @@ a {
   color: inherit;
 }
 
-#left {
-  top: 0;
-  left: 0;
+#map {
   width: 100vw;
   height: 100vh;
   z-index: 7;
 }
 
-#right {
+#sidebar {
   z-index: 8;
 
   background: var(--col-darker);
@@ -79,9 +77,6 @@ a {
   box-shadow: var(--box-shadow);
   height: 100vh;
   overflow: scroll;
-
-  right: 0;
-  top: 0;
   width: 27.5rem;
 }
 
@@ -148,6 +143,77 @@ a {
   padding: 0.75rem;
   margin-bottom: 0.75rem;
   width: 80%;
+}
+
+/* Account */
+
+/* A box over the map, top right */
+.account {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9;
+  max-width: 22rem;
+  padding: 0.6rem 1rem;
+  background: var(--col-darker);
+  border-radius: 0.3rem;
+  box-shadow: var(--box-shadow);
+  text-align: center;
+  color: var(--col-light);
+  font-size: 0.9rem;
+}
+
+.account:empty {
+  display: none;
+}
+
+.account strong,
+.account .link {
+  color: var(--col-lightest);
+}
+
+.account .link {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.account .link:hover {
+  color: var(--col-lighter);
+}
+
+.account .row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.account input,
+.account button:not(.link) {
+  font: inherit;
+  color: var(--col-lightest);
+  background: var(--col-dark);
+  border: 0.1rem solid var(--col-dark);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.account input {
+  flex: 1;
+  min-width: 0;
+}
+
+.account button:not(.link) {
+  white-space: nowrap;
+  cursor: pointer;
+  border-color: var(--col-light);
+}
+
+.account .error {
+  color: var(--col-pastel-red);
 }
 
 /* Directory */
@@ -376,14 +442,6 @@ a {
   height: 0;
 }
 
-.leaflet-control {
-  box-shadow: var(--box-shadow);
-}
-
-.leaflet-control-coordinates {
-  padding: 0.6rem;
-}
-
 /* Tooltips: tippy for icons, Leaflet's for map objects */
 
 .leaflet-tooltip,
@@ -420,14 +478,53 @@ a {
   font-weight: 500;
 }
 
-/* Coordinates */
+/* Leaflet's controls, in dark boxes like the tooltips. The extra
+   .leaflet-container beats Leaflet's own colors, borders, and shadows. */
+
+.leaflet-container .leaflet-control {
+  background: var(--col-darker);
+  color: var(--col-lightest);
+  border: none;
+  border-radius: 0.3rem;
+  box-shadow: var(--box-shadow);
+}
+
+/* The coordinates, today's date, and the layer list */
+.leaflet-container .map-box,
+.leaflet-container .leaflet-control-layers-expanded {
+  padding: 0.6rem;
+  line-height: 1.5rem;
+  cursor: pointer;
+}
+
+.leaflet-container a.map-box:hover {
+  color: var(--col-lighter);
+}
+
+/* Dark checkboxes */
+.leaflet-control-layers {
+  color-scheme: dark;
+}
+
+/* Zoom buttons */
+.leaflet-container .leaflet-bar a {
+  background: var(--col-darker);
+  color: var(--col-lightest);
+  border-bottom-color: var(--col-dark);
+}
+
+.leaflet-container .leaflet-bar a:hover,
+.leaflet-container .leaflet-bar a:focus {
+  background: var(--col-dark);
+}
+
+.leaflet-container .leaflet-bar a.leaflet-disabled {
+  background: var(--col-darker);
+  color: var(--col-light);
+}
 
 .leaflet-control-coordinates {
-  background: var(--col-darker);
-  border-radius: 0.3rem;
   cursor: pointer;
-  color: var(--col-lightest);
-  line-height: 1.5rem;
 }
 
 .mono {
@@ -435,8 +532,3 @@ a {
 }
 
 .leaflet-control-coordinates strong {}
-
-.leaflet-control-coordinates,
-.leaflet-control-zoom {
-  box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
-}

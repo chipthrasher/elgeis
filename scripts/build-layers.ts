@@ -1,7 +1,7 @@
 // Builds the layer folders in layers/ into static JSON for the map:
 //
-//   layers/<id>/layer.json      the layer's manifest (name, dimension, schema)
-//   layers/<id>/<object>.json   one GeoJSON Feature per object
+//   <layers dir>/<id>/layer.json      the layer's manifest (name, dimension, schema)
+//   <layers dir>/<id>/<object>.json   one GeoJSON Feature per object
 //
 // becomes
 //
@@ -10,7 +10,8 @@
 //
 // Everything is validated first, and nothing is written if anything is invalid.
 //
-// Usage: node scripts/build-layers.ts [layers dir] [output dir]
+// The backend runs this on the layers repo. To run it yourself:
+//   node scripts/build-layers.ts <layers dir> <output dir>
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -44,7 +45,7 @@ export function readLayers(dir: string): LayerData[] {
     }
 
     const layers: LayerData[] = []
-    const folders = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name).sort()
+    const folders = fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.startsWith('.')).map(d => d.name).sort()
     for (const folder of folders) {
         const manifestFile = path.join(dir, folder, MANIFEST)
         const layer = parse(Layer, manifestFile)
@@ -108,7 +109,11 @@ export function buildLayers(layersDir: string, outDir: string): LayerData[] {
 }
 
 if (import.meta.main) {
-    const [layersDir = 'layers', outDir = 'dist/layers'] = process.argv.slice(2)
+    const [layersDir, outDir] = process.argv.slice(2)
+    if (!layersDir || !outDir) {
+        console.error('Usage: node scripts/build-layers.ts <layers dir> <output dir>')
+        process.exit(1)
+    }
     try {
         const layers = buildLayers(layersDir, outDir)
         const count = layers.reduce((n, l) => n + l.objects.length, 0)

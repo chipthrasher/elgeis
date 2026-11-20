@@ -9,6 +9,8 @@
     "@eslint/js": "^10.0.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
     "@types/polylabel": "^2.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.15.0",
@@ -17,15 +19,20 @@
     "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.9",
+    "better-auth": "^1.7.26",
+    "hono": "^4.13.19",
+    "kysely": "^0.29.9",
     "leaflet": "^1.9.4",
+    "nodemailer": "^10.6.0",
+    "pg": "^8.23.1",
     "polylabel": "^2.1.0",
     "tippy.js": "^6.3.7",
     "zod": "^4.6.7"
   },
   "scripts": {
-    "build": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
-    "dev": "node --watch-path=layers --watch-path=shared --watch-preserve-output scripts/build-layers.ts & esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
+    "build": "esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
     "lint": "eslint . && tsc",
-    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts'"
+    "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts' 'backend/**/*.test.ts'"
   }
 }

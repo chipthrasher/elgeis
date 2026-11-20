@@ -1,0 +1,32 @@
+# Shortcuts for running the site with Docker Compose. Needs Task
+# (https://taskfile.dev). Runs the dev setup unless you add PROD=1, e.g.
+# `task up PROD=1` on the server.
+
+version: '3'
+
+tasks:
+  compose:
+    internal: true
+    cmds:
+      - docker compose -f compose.yaml {{if not .PROD}}-f compose.dev.yaml{{end}} {{.ARGS}}
+
+  up:
+    desc: Build and start the site in the background
+    preconditions:
+      - sh: test -f .env
+        msg: No .env yet. Copy .env.example to .env and fill it in.
+    cmds:
+      - task: compose
+        vars: { PROD: '{{.PROD}}', ARGS: up -d --build }
+
+  down:
+    desc: Stop the site (data in volumes is kept)
+    cmds:
+      - task: compose
+        vars: { PROD: '{{.PROD}}', ARGS: down }
+
+  logs:
+    desc: 'Follow the logs, e.g. `task logs` or `task logs -- backend`'
+    cmds:
+      - task: compose
+        vars: { PROD: '{{.PROD}}', ARGS: 'logs -f {{.CLI_ARGS}}' }
