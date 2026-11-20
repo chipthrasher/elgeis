@@ -3,14 +3,13 @@
 
 import { Kysely, PostgresDialect, type ColumnType, type Generated } from 'kysely'
 import pg from 'pg'
+import type { Op, Status } from '../shared/changes.ts'
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>
 // jsonb columns are read as parsed JSON but written as JSON text, since pg
 // would otherwise send JS arrays as Postgres arrays.
 type Json<T> = ColumnType<T, string, string>
 
-export const CHANGE_REQUEST_STATUSES = ['draft', 'submitted', 'stale', 'approved', 'rejected', 'withdrawn'] as const
-export type ChangeRequestStatus = typeof CHANGE_REQUEST_STATUSES[number]
 
 export interface Database {
     // Better Auth's, with only the columns we use. It has more tables too.
@@ -45,9 +44,9 @@ export interface Database {
         id: Generated<number>
         layerId: string
         authorId: string
-        status: Generated<ChangeRequestStatus>
+        status: Generated<Status>
         title: Generated<string>
-        ops: Json<unknown[]>
+        ops: Json<Op[]>
         createdAt: Generated<Date>
         updatedAt: Generated<Date>
         submittedAt: Timestamp | null
