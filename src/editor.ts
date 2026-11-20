@@ -1,0 +1,512 @@
+// The editor: a panel for suggesting changes to the map as change requests,
+// following your own requests, and reviewing others'. Forms are generated from
+// each layer's schema, so nothing here knows about any particular layer.
+
+import L from 'leaflet'
+import { MAX_OPEN_REQUESTS, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
+import { nearestOnLines } from '../shared/geometry.ts'
+import {
+    DIMENSION_SCALE, entityName, idPrefixFor, newId,
+    type Field, type Geometry, type LayerObject, type Position, type PropertyValue,
+} from '../shared/layer.ts'
+import { api, type ChangeRequest, type FullLayer } from './api.ts'
+import { el } from './dom.ts'
+import { editShape, type ShapeEditor, type ShapeKind } from './draw.ts'
+import type { MapLayer, MapObject } from './layers.ts'
+import { toLatLng } from './map.ts'
+import type { ObjectIndex } from './objects.ts'
+import { describe, describeOp, showChanges, staleIds } from './review.ts'
+
+interface Draft {
+    id?: number
+    layerId: string
+    title: string
+    ops: Op[]
+}
+
+const STATUS_TEXT: Record<string, string> = {
+    draft: 'Draft', submitted: 'Waiting for review', stale: 'Needs updating',
+    approved: 'Approved', rejected: 'Rejected', withdrawn: 'Withdrawn',
+}
+
+const button = (text: string, onClick: () => void, cls = '') => {
+    const b = el('button', { type: 'button', class: cls }, text)
+    b.addEventListener('click', onClick)
+    return b
+}
+
+export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex) {
+    const panel = document.querySelector<HTMLElement>('#panel')!
+    const cache = new Map<string, FullLayer>()
+    let draft: Draft | null = null
+    // The layer whose objects open in the editor when clicked on the map.
+    let picking: string | null = null
+    // Whether a shape is being drawn or edited, when clicks belong to it.
+    let drawing = false
+    // Undoes what the current view put on the map.
+    let cleanup: (() => void) | null = null
+
+    const load = async (layerId: string, fresh = false) => {
+        if (fresh || !cache.has(layerId)) cache.set(layerId, await api<FullLayer>(`layers/${layerId}`))
+        return cache.get(layerId)!
+    }
+
+    function show(title: string, ...children: (Node | string | null | false)[]) {
+        cleanup?.()
+        cleanup = null
+        picking = null
+        panel.replaceChildren(
+            el('div', { class: 'panel-head' }, [el('h2', {}, title), button('×', close, 'link close')]),
+            ...children.filter((c): c is Node | string => !!c),
+        )
+        panel.classList.remove('hidden')
+    }
+
+    function close() {
+        cleanup?.()
+        cleanup = null
+        picking = null
+        panel.classList.add('hidden')
+    }
+
+    const errorBox = () => el('div', { class: 'error' })
+    // Run an action, showing what went wrong in the box if it fails.
+    async function attempt(box: HTMLElement, action: () => Promise<void>) {
+        box.textContent = ''
+        try {
+            await action()
+        } catch (e) {
+            box.textContent = (e as Error).message
+        }
+    }
+
+    /* Saving drafts */
+
+    const toDraft = (r: ChangeRequest): Draft => ({ id: r.id, layerId: r.layerId, title: r.title, ops: r.ops })
+
+    // Save the draft with these ops. The backend checks them, so a bad change
+    // is refused before it's added.
+    async function save(next: Draft) {
+        const body = { title: next.title, ops: next.ops }
+        const saved = next.id
+            ? await api<ChangeRequest>(`requests/${next.id}`, body, 'PUT')
+            : await api<ChangeRequest>('requests', { ...body, layerId: next.layerId })
+        draft = toDraft(saved)
+    }
+
+    // Start or carry on a draft for this layer, picking up your latest one.
+    async function draftFor(layerId: string): Promise<Draft> {
+        if (draft?.layerId === layerId) return draft
+        const mine = await api<ChangeRequest[]>('requests?mine')
+        const open = mine.find(r => r.layerId === layerId && (r.status === 'draft' || r.status === 'stale'))
+        return open ? toDraft(open) : { layerId, title: '', ops: [] }
+    }
+
+    async function setOp(layerId: string, ops: Op[], remove: string[] = []) {
+        const current = await draftFor(layerId)
+        const ids = new Set([...ops.map(opId), ...remove])
+        const next = { ...current, ops: [...current.ops.filter(op => !ids.has(opId(op))), ...ops] }
+        if (!next.title && next.ops.length) next.title = describeOp(await load(layerId), next.ops[0])
+        await save(next)
+    }
+
+    /* Home: pick a layer, then an object */
+
+    async function home(layerId = draft?.layerId ?? layers[0]?.layer.id) {
+        if (!layerId) return
+        const data = await load(layerId)
+        const select = el('select', {}, layers.map(l => el('option', { value: l.layer.id, selected: l.layer.id === layerId }, l.layer.name)))
+        select.addEventListener('change', () => home(select.value))
+
+        const search = el('input', { type: 'search', placeholder: 'Find something to change' })
+        const results = el('div', { class: 'results' })
+        const list = () => {
+            const q = search.value.toLowerCase()
+            const matches = data.objects
+                .map(o => ({ o, name: describe(data.layer, o) }))
+                .filter(({ name }) => q && name.toLowerCase().includes(q))
+                .slice(0, 30)
+            results.replaceChildren(...matches.map(({ o, name }) =>
+                button(name + (o.properties.hidden ? ' (hidden)' : '') + (o.geometry ? '' : ' (no shape)'), () => form(layerId, o.id), 'result')))
+        }
+        search.addEventListener('input', list)
+
+        const current = draft?.layerId === layerId ? draft : null
+        show('Suggest a change',
+            el('label', {}, ['Layer ', select]),
+            el('p', { class: 'muted' }, 'Click something on the map, or find it here, to change it. Hidden things are listed too.'),
+            search, results,
+            el('div', { class: 'row' }, [
+                'New: ',
+                ...(['Point', 'LineString', 'Polygon'] as const).map(kind =>
+                    button({ Point: 'point', LineString: 'line', Polygon: 'area' }[kind], () => form(layerId, null, kind))),
+                button('entry without a shape', () => form(layerId, null, null)),
+            ]),
+            current && current.ops.length > 0 && el('p', {}, [
+                `Your change request has ${current.ops.length} change${current.ops.length === 1 ? '' : 's'}. `,
+                button('Review and submit it', draftView, 'link'),
+            ]),
+        )
+        picking = layerId
+        search.focus()
+    }
+
+    /* The form for one object */
+
+    // An input for a field, and how to read its value back.
+    function fieldInput(field: Field, value: PropertyValue | undefined, original: PropertyValue | undefined) {
+        const id = `field-${field.key}`
+        // Suggestions, as [value, label] pairs.
+        const suggest = (options: [string, string][]) => {
+            input.setAttribute('list', id + '-list')
+            return el('datalist', { id: id + '-list' }, options.map(([value, label]) => el('option', { value }, label)))
+        }
+        const asText = (v: PropertyValue | undefined) => Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : ''
+        const input = el('input', { id, value: asText(value) })
+        // Lists are typed comma-separated. A single reference stays a string.
+        const readList = () => {
+            const items = input.value.split(',').map(s => s.trim()).filter(Boolean)
+            if (items.length === 0) return undefined
+            return field.type === 'reference' && items.length === 1 && !Array.isArray(original) ? items[0] : items
+        }
+
+        switch (field.type) {
+            case 'flag': {
+                const box = el('input', { id, type: 'checkbox', checked: value === true })
+                return { node: el('label', { class: 'check' }, [box, ' ', field.label]), read: () => box.checked || undefined }
+            }
+            case 'color': {
+                const picker = el('input', { type: 'color', value: typeof value === 'string' && value.length === 7 ? value : '#888888' })
+                picker.addEventListener('input', () => { input.value = picker.value })
+                input.placeholder = '#rrggbb'
+                return { node: labelled(field, el('div', { class: 'row' }, [input, picker])), read: () => input.value.trim() || undefined }
+            }
+            case 'entities':
+                input.placeholder = 'Names, separated by commas'
+                return { node: labelled(field, input, suggest(index.entityNames().map(n => [n, n]))), read: readList }
+            case 'reference':
+                input.placeholder = 'IDs, separated by commas'
+                return { node: labelled(field, input, suggest(index.all.map(o => [o.object.id, index.title(o) || o.object.id]))), read: readList }
+            case 'url':
+                input.type = 'url'
+                return { node: labelled(field, input), read: () => input.value.trim() || undefined }
+            case 'text':
+                return { node: labelled(field, input), read: () => input.value.trim() || undefined }
+        }
+    }
+
+    const labelled = (field: Field, ...inputs: Node[]) =>
+        el('label', { class: 'field', title: field.description }, [el('span', {}, field.label), ...inputs])
+
+    // Edit an object (by ID), or make a new one of a kind (null: no shape).
+    async function form(layerId: string, id: string | null, kind?: ShapeKind | null) {
+        const data = await load(layerId)
+        const { layer } = data
+        const current = await draftFor(layerId)
+        const original = id ? data.objects.find(o => o.id === id) : undefined
+        const pending = current.ops.find(op => opId(op) === id)
+        if (id && !original && pending?.op !== 'add') return home(layerId)
+        // Start from the change already in the draft, if there is one.
+        const start: LayerObject = pending && pending.op !== 'delete' ? pending.object : original ?? {
+            type: 'Feature', id: '', geometry: null, properties: {},
+        }
+        const shapeKind: ShapeKind | null = kind !== undefined ? kind : shapeKindOf(start.geometry)
+
+        const inputs = layer.fields.map(f => ({ field: f, ...fieldInput(f, start.properties[f.key], original?.properties[f.key]) }))
+        const hidden = el('input', { type: 'checkbox', checked: start.properties.hidden === true })
+
+        // The shape: unchanged unless it's edited.
+        let geometry = start.geometry
+        let shapeEditor: ShapeEditor | null = null
+        const shapeBox = el('div', { class: 'shape' })
+        const drawn = id ? index.get(id) : undefined
+        const connector = portalConnector(data, start)
+
+        function editGeometry() {
+            if (!shapeKind) return
+            // Hide the object's own drawing while its shape is edited.
+            const group = drawn?.drawn && layers.find(l => l.layer === drawn.layer)?.group
+            if (group) group.removeLayer(drawn.drawn!)
+            const point = start.geometry?.type === 'GeometryCollection' ? start.geometry.geometries[0] : start.geometry
+            shapeEditor = editShape(map, shapeKind, point, DIMENSION_SCALE[layer.dimension], () => {
+                geometry = shapeEditor?.geometry() ?? null
+                connector?.update(geometry)
+            })
+            drawing = true
+            const stopShape = () => {
+                drawing = false
+                shapeEditor?.stop()
+                connector?.stop()
+                if (group) group.addLayer(drawn.drawn!)
+            }
+            const previous = cleanup
+            cleanup = () => { stopShape(); previous?.() }
+            shapeBox.replaceChildren(el('div', {}, [
+                el('p', { class: 'muted' }, shapeHelp(shapeKind, !!start.geometry)),
+                shapeKind === 'Polygon' && el('div', { class: 'row' }, [
+                    button('Cut a hole', () => shapeEditor?.addRing('hole')),
+                    button('Add another part', () => shapeEditor?.addRing('part')),
+                ]),
+                connector?.node,
+            ]))
+        }
+        if (shapeKind) {
+            shapeBox.append(button(start.geometry ? 'Edit the shape' : 'Draw it', editGeometry))
+            if (!start.geometry) setTimeout(editGeometry)
+        }
+
+        const error = errorBox()
+        function read(): LayerObject {
+            const properties: Record<string, PropertyValue> = {}
+            for (const { field, read } of inputs) {
+                const value = read()
+                if (value !== undefined) properties[field.key] = value
+            }
+            if (hidden.checked) properties.hidden = true
+            const g = shapeEditor && connector ? connector.wrap(geometry) : geometry
+            return { type: 'Feature', id: start.id || newId(idPrefixFor(g)), geometry: g, properties }
+        }
+
+        async function submit() {
+            await attempt(error, async () => {
+                const object = read()
+                if (shapeKind && !object.geometry) throw new Error('Draw its shape first')
+                const ops: Op[] = [original
+                    ? { op: 'update', baseVersion: objectVersion(original), object }
+                    : { op: 'add', object }]
+                ops.push(...renames(data, original, object))
+                await setOp(layerId, ops)
+                draftView()
+            })
+        }
+
+        async function remove() {
+            await attempt(error, async () => {
+                await setOp(layerId, original ? [{ op: 'delete', id: original.id, baseVersion: objectVersion(original) }] : [], [id!])
+                draftView()
+            })
+        }
+
+        show(original ? `Change ${describe(layer, original)}` : `New ${shapeKind ? { Point: 'point', LineString: 'line', Polygon: 'area' }[shapeKind] : 'entry'}`,
+            el('p', { class: 'muted' }, `In ${layer.name}`),
+            ...inputs.map(i => i.node),
+            el('label', { class: 'check' }, [hidden, ' Hidden from the map']),
+            shapeBox,
+            error,
+            el('div', { class: 'row' }, [
+                button('Add to my change request', submit, 'primary'),
+                (original || pending) && button(original ? 'Delete it' : 'Remove it', remove),
+                button('Cancel', () => home(layerId), 'link'),
+            ]),
+        )
+    }
+
+    // Renaming an entity renames it wherever its layer lists it, too.
+    function renames(data: FullLayer, before: LayerObject | undefined, after: LayerObject): Op[] {
+        const oldName = before && entityName(data.layer, before)
+        const newName = entityName(data.layer, after)
+        if (!oldName || oldName === newName) return []
+        const fields = data.layer.fields.filter(f => f.type === 'entities')
+        return data.objects.flatMap((o): Op[] => {
+            const touched = fields.filter(f => (o.properties[f.key] as string[] | undefined)?.includes(oldName))
+            if (!touched.length || o.id === after.id) return []
+            const properties = { ...o.properties }
+            for (const f of touched) properties[f.key] = (properties[f.key] as string[]).map(n => n === oldName ? newName! : n)
+            return [{ op: 'update', baseVersion: objectVersion(o), object: { ...o, properties } }]
+        })
+    }
+
+    /* Nether portals: a suggested connector to the nearest highway line */
+
+    function portalConnector(data: FullLayer, start: LayerObject) {
+        if (data.layer.dimension !== 'nether' || shapeKindOf(start.geometry) !== 'Point') return null
+        const scale = DIMENSION_SCALE[data.layer.dimension]
+        const lines = data.objects
+            .filter(o => o.geometry?.type === 'LineString' && !o.properties.hidden)
+            .map(o => (o.geometry as { coordinates: Position[] }).coordinates)
+        const had = start.geometry?.type === 'GeometryCollection'
+        const box = el('input', { type: 'checkbox', checked: had || !start.geometry })
+        const text = el('span', {}, 'Connect it to the nearest highway')
+        const preview = L.polyline([], { className: 'connector', interactive: false }).addTo(map)
+        let target: Position | null = null
+        let point: Position | null = null
+
+        const redraw = () => preview.setLatLngs(box.checked && point && target ? [point, target].map(([x, z]) => toLatLng(x * scale, z * scale)) : [])
+        box.addEventListener('change', redraw)
+        return {
+            node: el('label', { class: 'check' }, [box, ' ', text]),
+            update(g: Geometry | null) {
+                point = g?.type === 'Point' ? g.coordinates : null
+                const nearest = point && nearestOnLines(point, lines)
+                target = nearest && nearest.distance > 0 ? nearest.point : null
+                text.textContent = target ? `Connect it to the nearest highway (${Math.round(nearest!.distance)} blocks)` : 'Connect it to the nearest highway'
+                redraw()
+            },
+            wrap(g: Geometry | null): Geometry | null {
+                if (g?.type !== 'Point' || !box.checked || !target) return g
+                return { type: 'GeometryCollection', geometries: [g, { type: 'LineString', coordinates: [g.coordinates, target] }] }
+            },
+            stop: () => preview.remove(),
+        }
+    }
+
+    /* The draft */
+
+    async function draftView() {
+        if (!draft) return myRequests()
+        const current = draft
+        const data = await load(current.layerId)
+        const error = errorBox()
+        const title = el('input', { value: current.title, placeholder: 'What does this change?' })
+
+        show('Your change request',
+            el('p', { class: 'muted' }, `For ${data.layer.name}. Nothing goes live until a layer admin approves it.`),
+            el('label', { class: 'field' }, [el('span', {}, 'Title'), title]),
+            el('div', { class: 'changes' }, current.ops.map(op => el('div', { class: 'row op' }, [
+                el('span', { class: `change-title ${op.op}` }, describeOp(data, op)),
+                op.op !== 'delete' && button('Edit', () => form(current.layerId, opId(op)), 'link'),
+                button('Remove', () => attempt(error, async () => {
+                    await save({ ...current, ops: current.ops.filter(o => o !== op) })
+                    draftView()
+                }), 'link'),
+            ]))),
+            current.ops.length === 0 && el('p', { class: 'muted' }, 'No changes yet.'),
+            error,
+            el('div', { class: 'row' }, [
+                button('Submit for review', () => attempt(error, async () => {
+                    if (!current.id) throw new Error('Add a change first')
+                    if (title.value.trim() !== current.title) await save({ ...current, title: title.value.trim() })
+                    const r = await api<ChangeRequest>(`requests/${draft!.id}/submit`, {})
+                    draft = null
+                    openRequest(r.id)
+                }), 'primary'),
+                button('Add another change', () => attempt(error, async () => {
+                    if (current.id && title.value.trim() !== current.title) await save({ ...current, title: title.value.trim() })
+                    home(current.layerId)
+                })),
+                !!current.id && button('Throw it away', () => attempt(error, async () => {
+                    await api(`requests/${current.id}/withdraw`, {})
+                    draft = null
+                    myRequests()
+                }), 'link'),
+            ]),
+        )
+    }
+
+    /* Requests: yours, those to review, and one at a time */
+
+    function requestList(requests: ChangeRequest[], empty: string) {
+        if (requests.length === 0) return el('p', { class: 'muted' }, empty)
+        return el('div', { class: 'requests' }, requests.map(r => {
+            const b = button('', () => openRequest(r.id), 'request')
+            b.append(
+                el('span', {}, r.title || 'Untitled'),
+                el('span', { class: `status ${r.status}` }, STATUS_TEXT[r.status] + (r.mine ? '' : ` · ${r.author ?? 'someone'}`)),
+            )
+            return b
+        }))
+    }
+
+    async function myRequests() {
+        const mine = await api<ChangeRequest[]>('requests?mine')
+        const open = mine.filter(r => OPEN_STATUSES.includes(r.status)).length
+        show('Your change requests',
+            el('p', { class: 'muted' }, `${open} of ${MAX_OPEN_REQUESTS} open.`),
+            requestList(mine, "You haven't suggested any changes yet."),
+            button('Suggest a change', () => home(), 'primary'),
+        )
+    }
+
+    async function reviewQueue() {
+        const requests = await api<ChangeRequest[]>('requests?review')
+        show('Waiting for review', requestList(requests, 'Nothing to review right now.'))
+    }
+
+    async function openRequest(id: number) {
+        const request = await api<ChangeRequest>(`requests/${id}`)
+        const data = await load(request.layerId, true)
+        const error = errorBox()
+        const changes = el('div', { class: 'changes' })
+        const comment = el('textarea', { placeholder: request.canReview && request.status === 'submitted' ? 'A note for the author (optional)' : 'Add a comment' })
+        const act = (path: string, then: () => void) => () => attempt(error, async () => {
+            await api(`requests/${id}/${path}`, { comment: comment.value })
+            then()
+        })
+        const stale = request.mine && OPEN_STATUSES.includes(request.status) ? staleIds(data, request.ops) : []
+
+        show(request.title || 'Untitled',
+            el('p', { class: 'muted' }, [
+                `${STATUS_TEXT[request.status]} · ${data.layer.name} · by ${request.author ?? 'someone'}`,
+                request.reviewedBy && ` · reviewed by ${request.reviewedBy}`,
+            ]),
+            changes,
+            stale.length > 0 && el('div', { class: 'warning' }, [
+                'Some of what this changes has changed since. ',
+                button('Update to the latest', () => attempt(error, async () => {
+                    await save(rebase(data, request))
+                    openRequest(id)
+                }), 'link'),
+                ' (your version replaces the newer one, so check it first)',
+            ]),
+            el('div', { class: 'comments' }, request.comments.map(c => el('div', { class: 'comment' }, [el('strong', {}, c.author ?? 'someone'), ' ', c.body]))),
+            (request.mine || request.canReview) && comment,
+            error,
+            el('div', { class: 'row' }, [
+                request.canReview && request.status === 'submitted' && button('Approve', act('approve', () => openRequest(id)), 'primary'),
+                request.canReview && request.status === 'submitted' && button('Reject', act('reject', () => openRequest(id))),
+                (request.mine || request.canReview) && button('Comment', () => attempt(error, async () => {
+                    await api(`requests/${id}/comments`, { body: comment.value })
+                    openRequest(id)
+                }), 'link'),
+                request.mine && OPEN_STATUSES.includes(request.status) && button('Edit', () => {
+                    draft = toDraft(request)
+                    draftView()
+                }, 'link'),
+                request.mine && OPEN_STATUSES.includes(request.status) && button('Withdraw', act('withdraw', myRequests), 'link'),
+            ]),
+        )
+        cleanup = showChanges(map, data, request, changes)
+    }
+
+    // Point a stale request's changes at the latest versions, dropping
+    // changes to objects that are gone.
+    function rebase(data: FullLayer, request: ChangeRequest): Draft {
+        const ops = request.ops.flatMap((op): Op[] => {
+            if (op.op === 'add') return [op]
+            const current = data.objects.find(o => o.id === opId(op))
+            return current ? [{ ...op, baseVersion: objectVersion(current) }] : []
+        })
+        return { ...toDraft(request), ops }
+    }
+
+    // Clicking something on the map, while picking, opens it in the editor.
+    // Returns whether the editor took the click.
+    function pick(o: MapObject): boolean {
+        if (drawing) return true
+        if (picking !== o.layer.id) return false
+        form(o.layer.id, o.object.id)
+        return true
+    }
+
+    return { home, myRequests, reviewQueue, pick }
+}
+
+function shapeKindOf(geometry: Geometry | null): ShapeKind | null {
+    switch (geometry?.type) {
+        case undefined: return null
+        case 'Point': return 'Point'
+        case 'LineString': return 'LineString'
+        case 'Polygon':
+        case 'MultiPolygon': return 'Polygon'
+        case 'GeometryCollection': return shapeKindOf(geometry.geometries[0])
+    }
+}
+
+function shapeHelp(kind: ShapeKind, existing: boolean): string {
+    const snap = ' Corners snap to nearby corners; hold Alt to stop them.'
+    if (kind === 'Point') return (existing ? 'Drag the point to move it.' : 'Click the map to place it.') + snap
+    const what = kind === 'Polygon' ? 'area' : 'line'
+    return (existing
+        ? `Drag the corners to reshape the ${what}, drag the small markers between them to add corners, and right-click a corner to remove it.`
+        : `Click the map to add corners, and click the ${kind === 'Polygon' ? 'first' : 'last'} corner again to finish.`) + snap
+}

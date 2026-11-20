@@ -68,12 +68,14 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
         pointToLayer: (_, latlng) => L.marker(latlng, {
             icon: L.divIcon({ className: ring ? 'point ring' : 'point', iconSize: [10, 10] }),
+            // Shapes being drawn snap to these (see draw.ts).
+            snapIgnore: false,
         }),
         style: feature => {
             const polygon = /Polygon/.test(feature?.geometry.type ?? '')
             return polygon
-                ? { className: 'polygon', pane: 'polygons', renderer: polygonRenderer, color: NO_COLOR, fillColor: NO_COLOR }
-                : { className: 'line', renderer: lineRenderer, interactive: false }
+                ? { className: 'polygon', pane: 'polygons', renderer: polygonRenderer, color: NO_COLOR, fillColor: NO_COLOR, snapIgnore: false }
+                : { className: 'line', renderer: lineRenderer, interactive: false, snapIgnore: false }
         },
         // Tag each element with its object's ID, e.g. `[data-id="pol_8f3k2a9x"]`.
         // Leaflet makes new elements whenever a layer is re-added, so tag on every add.

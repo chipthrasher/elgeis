@@ -21,6 +21,8 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
         maxBounds: [[-3 * MAP_SIZE, -3 * MAP_SIZE], [3 * MAP_SIZE, 3 * MAP_SIZE]],
         center: [0, 0],
         attributionControl: false,
+        // Lets the editor draw on it (see draw.ts).
+        pmIgnore: false,
     })
 
     // A render of the world from the server's dynmap, drawn beneath every layer.

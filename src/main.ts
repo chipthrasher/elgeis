@@ -1,7 +1,9 @@
 // Entry point
 
 import L from 'leaflet'
-import { createAccount } from './account.ts'
+import { createAccount, linkButton } from './account.ts'
+import { api } from './api.ts'
+import { createEditor } from './editor.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers } from './layers.ts'
@@ -37,7 +39,18 @@ function save(map: L.Map, toggles: Toggle[]) {
 const PAUSED = ['nether']
 
 async function main() {
-    createAccount(document.querySelector('#account')!)
+    let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
+    const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
+    createAccount(document.querySelector('#account')!, async user => {
+        const editor = await ready
+        // Reviewers get a link to what's waiting for them.
+        const waiting = await api<unknown[]>('requests?review')
+        return [
+            linkButton('Suggest a change', () => editor.home()),
+            linkButton('Your changes', () => editor.myRequests()),
+            (waiting.length > 0 || user.role === 'admin') && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
+        ].filter((n): n is HTMLButtonElement => !!n)
+    })
     const allLayers = await loadLayers()
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const { map, dynmap } = createMap()
@@ -55,7 +68,9 @@ async function main() {
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.label(o))
-    createSidebar(map, layers, index)
+    const editor = createEditor(map, layers, index)
+    resolveEditor!(editor)
+    createSidebar(map, layers, index, editor.pick)
 }
 
 main()
