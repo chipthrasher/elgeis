@@ -6,8 +6,8 @@ import L from 'leaflet'
 import { MAX_OPEN_REQUESTS, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
 import { nearestOnLines } from '../shared/geometry.ts'
 import {
-    DIMENSION_SCALE, entityName, idPrefixFor, newId,
-    type Field, type Geometry, type LayerObject, type Position, type PropertyValue,
+    DIMENSION_SCALE, idPrefixFor, newId,
+    type Field, type Geometry, type Layer, type LayerObject, type Position, type PropertyValue,
 } from '../shared/layer.ts'
 import { api, type ChangeRequest, type FullLayer } from './api.ts'
 import { el } from './dom.ts'
@@ -15,7 +15,8 @@ import { editShape, type ShapeEditor, type ShapeKind } from './draw.ts'
 import type { MapLayer, MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 import type { ObjectIndex } from './objects.ts'
-import { describe, describeOp, showChanges, staleIds } from './review.ts'
+import { Names } from './names.ts'
+import { describeOp, showChanges, staleIds } from './review.ts'
 
 interface Draft {
     id?: number
@@ -38,6 +39,10 @@ const button = (text: string, onClick: () => void, cls = '') => {
 export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex) {
     const panel = document.querySelector<HTMLElement>('#panel')!
     const cache = new Map<string, FullLayer>()
+    // Shows entities and references by name; knows hidden objects once their
+    // layer is loaded.
+    const names = new Names(index)
+    const nameOf = (layer: Layer, o: LayerObject) => names.describe(layer, o) || o.id
     let draft: Draft | null = null
     // The layer whose objects open in the editor when clicked on the map.
     let picking: string | null = null
@@ -47,7 +52,11 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     let cleanup: (() => void) | null = null
 
     const load = async (layerId: string, fresh = false) => {
-        if (fresh || !cache.has(layerId)) cache.set(layerId, await api<FullLayer>(`layers/${layerId}`))
+        if (fresh || !cache.has(layerId)) {
+            const data = await api<FullLayer>(`layers/${layerId}`)
+            cache.set(layerId, data)
+            names.add(data)
+        }
         return cache.get(layerId)!
     }
 
@@ -106,7 +115,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         const current = await draftFor(layerId)
         const ids = new Set([...ops.map(opId), ...remove])
         const next = { ...current, ops: [...current.ops.filter(op => !ids.has(opId(op))), ...ops] }
-        if (!next.title && next.ops.length) next.title = describeOp(await load(layerId), next.ops[0])
+        if (!next.title && next.ops.length) next.title = describeOp(names, await load(layerId), next.ops[0])
         await save(next)
     }
 
@@ -123,7 +132,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         const list = () => {
             const q = search.value.toLowerCase()
             const matches = data.objects
-                .map(o => ({ o, name: describe(data.layer, o) }))
+                .map(o => ({ o, name: nameOf(data.layer, o) }))
                 .filter(({ name }) => q && name.toLowerCase().includes(q))
                 .slice(0, 30)
             results.replaceChildren(...matches.map(({ o, name }) =>
@@ -156,18 +165,20 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     // An input for a field, and how to read its value back.
     function fieldInput(field: Field, value: PropertyValue | undefined, original: PropertyValue | undefined) {
         const id = `field-${field.key}`
-        // Suggestions, as [value, label] pairs.
-        const suggest = (options: [string, string][]) => {
+        const input = el('input', { id, value: typeof value === 'string' ? value : '' })
+        // Entities and references are typed by name, comma-separated, and
+        // stored by ID. A single reference stays a string.
+        const linked = () => {
+            input.value = names.format(field, value)
+            input.placeholder = 'Names, separated by commas'
             input.setAttribute('list', id + '-list')
-            return el('datalist', { id: id + '-list' }, options.map(([value, label]) => el('option', { value }, label)))
-        }
-        const asText = (v: PropertyValue | undefined) => Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : ''
-        const input = el('input', { id, value: asText(value) })
-        // Lists are typed comma-separated. A single reference stays a string.
-        const readList = () => {
-            const items = input.value.split(',').map(s => s.trim()).filter(Boolean)
-            if (items.length === 0) return undefined
-            return field.type === 'reference' && items.length === 1 && !Array.isArray(original) ? items[0] : items
+            const datalist = el('datalist', { id: id + '-list' }, names.options(field).map(option => el('option', { value: option })))
+            const read = () => {
+                const ids = names.parse(field, input.value)
+                if (ids.length === 0) return undefined
+                return field.type === 'reference' && ids.length === 1 && !Array.isArray(original) ? ids[0] : ids
+            }
+            return { node: labelled(field, input, datalist), read }
         }
 
         switch (field.type) {
@@ -182,11 +193,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 return { node: labelled(field, el('div', { class: 'row' }, [input, picker])), read: () => input.value.trim() || undefined }
             }
             case 'entities':
-                input.placeholder = 'Names, separated by commas'
-                return { node: labelled(field, input, suggest(index.entityNames().map(n => [n, n]))), read: readList }
             case 'reference':
-                input.placeholder = 'IDs, separated by commas'
-                return { node: labelled(field, input, suggest(index.all.map(o => [o.object.id, index.title(o) || o.object.id]))), read: readList }
+                return linked()
             case 'url':
                 input.type = 'url'
                 return { node: labelled(field, input), read: () => input.value.trim() || undefined }
@@ -261,6 +269,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             for (const { field, read } of inputs) {
                 const value = read()
                 if (value !== undefined) properties[field.key] = value
+                // Leave fields that were empty as they were.
+                else if (start.properties[field.key] === '') properties[field.key] = ''
             }
             if (hidden.checked) properties.hidden = true
             const g = shapeEditor && connector ? connector.wrap(geometry) : geometry
@@ -274,7 +284,6 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 const ops: Op[] = [original
                     ? { op: 'update', baseVersion: objectVersion(original), object }
                     : { op: 'add', object }]
-                ops.push(...renames(data, original, object))
                 await setOp(layerId, ops)
                 draftView()
             })
@@ -287,7 +296,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             })
         }
 
-        show(original ? `Change ${describe(layer, original)}` : `New ${shapeKind ? { Point: 'point', LineString: 'line', Polygon: 'area' }[shapeKind] : 'entry'}`,
+        show(original ? `Change ${nameOf(layer, original)}` : `New ${shapeKind ? { Point: 'point', LineString: 'line', Polygon: 'area' }[shapeKind] : 'entry'}`,
             el('p', { class: 'muted' }, `In ${layer.name}`),
             ...inputs.map(i => i.node),
             el('label', { class: 'check' }, [hidden, ' Hidden from the map']),
@@ -299,21 +308,6 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 button('Cancel', () => home(layerId), 'link'),
             ]),
         )
-    }
-
-    // Renaming an entity renames it wherever its layer lists it, too.
-    function renames(data: FullLayer, before: LayerObject | undefined, after: LayerObject): Op[] {
-        const oldName = before && entityName(data.layer, before)
-        const newName = entityName(data.layer, after)
-        if (!oldName || oldName === newName) return []
-        const fields = data.layer.fields.filter(f => f.type === 'entities')
-        return data.objects.flatMap((o): Op[] => {
-            const touched = fields.filter(f => (o.properties[f.key] as string[] | undefined)?.includes(oldName))
-            if (!touched.length || o.id === after.id) return []
-            const properties = { ...o.properties }
-            for (const f of touched) properties[f.key] = (properties[f.key] as string[]).map(n => n === oldName ? newName! : n)
-            return [{ op: 'update', baseVersion: objectVersion(o), object: { ...o, properties } }]
-        })
     }
 
     /* Nether portals: a suggested connector to the nearest highway line */
@@ -363,7 +357,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             el('p', { class: 'muted' }, `For ${data.layer.name}. Nothing goes live until a layer admin approves it.`),
             el('label', { class: 'field' }, [el('span', {}, 'Title'), title]),
             el('div', { class: 'changes' }, current.ops.map(op => el('div', { class: 'row op' }, [
-                el('span', { class: `change-title ${op.op}` }, describeOp(data, op)),
+                el('span', { class: `change-title ${op.op}` }, describeOp(names, data, op)),
                 op.op !== 'delete' && button('Edit', () => form(current.layerId, opId(op)), 'link'),
                 button('Remove', () => attempt(error, async () => {
                     await save({ ...current, ops: current.ops.filter(o => o !== op) })
@@ -465,7 +459,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 request.mine && OPEN_STATUSES.includes(request.status) && button('Withdraw', act('withdraw', myRequests), 'link'),
             ]),
         )
-        cleanup = showChanges(map, data, request, changes)
+        cleanup = showChanges(map, names, data, request, changes)
     }
 
     // Point a stale request's changes at the latest versions, dropping

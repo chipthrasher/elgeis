@@ -39,8 +39,10 @@ export const DIMENSION_SCALE: Record<Dimension, number> = { overworld: 1, nether
 export const ICONS = ['flag', 'aperture', 'book', 'alert'] as const
 export type Icon = typeof ICONS[number]
 
-// `entities` lists entities by name, like ["Redstone Valley"], so a polygon
-// can be tied to its nation (or a disputed one to several) in plain text.
+// `entities` lists entities (like nations) by ID, e.g. ["ent_0068pnvf"], so a
+// polygon is tied to its nation (or a disputed one to several), in any layer.
+// Lists hold IDs so renaming a nation touches only the nation; the editor
+// shows their names.
 export const FIELD_TYPES = ['text', 'url', 'color', 'flag', 'reference', 'entities'] as const
 export type FieldType = typeof FIELD_TYPES[number]
 
@@ -131,7 +133,7 @@ const FIELD_VALUES: Record<FieldType, z.ZodType> = {
     color: z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"'),
     flag: z.boolean(),
     reference: z.union([ObjectId, z.array(ObjectId).min(1)]),
-    entities: z.array(z.string().min(1)).min(1),
+    entities: z.array(z.string().regex(/^ent_[0-9a-z]+$/, 'Expected an entity ID like "ent_8f3k2a9x"')).min(1),
 }
 
 export type PropertyValue = string | boolean | string[]
@@ -166,7 +168,7 @@ export function objectSchema(layer: Layer): z.ZodType<LayerObject> {
 }
 
 // The string values of an object's fields of one type, flattened, e.g. the IDs
-// of its reference fields or the names in its entities fields.
+// in its reference or entities fields.
 export function valuesOf(layer: Layer, object: LayerObject, type: FieldType): string[] {
     return layer.fields
         .filter(f => f.type === type)
@@ -174,7 +176,7 @@ export function valuesOf(layer: Layer, object: LayerObject, type: FieldType): st
         .filter((v): v is string => typeof v === 'string')
 }
 
-// An entity's name, which entities fields refer to it by.
+// An entity's name. Names are unique, so people can pick entities by name.
 export const entityName = (layer: Layer, object: LayerObject) =>
     object.id.startsWith('ent_') ? object.properties[layer.titleField] as string | undefined : undefined
 
@@ -192,12 +194,13 @@ export interface ObjectProblem {
 }
 
 // Checks across layers, on objects that are each valid on their own: IDs and
-// entity names are unique across all layers, and references (by ID or entity
-// name) point at objects that exist, in any layer.
+// entity names are unique across all layers, and references and entities
+// fields point at objects that exist, in any layer.
 export function checkLayers(layers: LayerData[]): ObjectProblem[] {
     const problems: ObjectProblem[] = []
     const ids = new Set<string>()
     const names = new Set<string>()
+    const entities = new Set<string>()
     for (const { layer, objects } of layers) {
         for (const object of objects) {
             const fail = (message: string) => problems.push({ layerId: layer.id, objectId: object.id, message })
@@ -206,6 +209,7 @@ export function checkLayers(layers: LayerData[]): ObjectProblem[] {
             const name = entityName(layer, object)
             if (name && names.has(name)) fail(`Duplicate entity name "${name}"`)
             if (name) names.add(name)
+            if (object.id.startsWith('ent_')) entities.add(object.id)
         }
     }
     for (const { layer, objects } of layers) {
@@ -214,8 +218,8 @@ export function checkLayers(layers: LayerData[]): ObjectProblem[] {
             for (const ref of valuesOf(layer, object, 'reference')) {
                 if (!ids.has(ref)) fail(`References missing object "${ref}"`)
             }
-            for (const name of valuesOf(layer, object, 'entities')) {
-                if (!names.has(name)) fail(`Lists missing entity "${name}"`)
+            for (const id of valuesOf(layer, object, 'entities')) {
+                if (!entities.has(id)) fail(`Lists missing entity "${id}"`)
             }
         }
     }

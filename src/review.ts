@@ -7,22 +7,17 @@ import L from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
 import { changedFields, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
 import { borderWarnings, polygonParts } from '../shared/geometry.ts'
-import { DIMENSION_SCALE, valuesOf, type Layer, type LayerObject, type PropertyValue } from '../shared/layer.ts'
+import { DIMENSION_SCALE, valuesOf, type Field, type Layer, type LayerObject, type PropertyValue } from '../shared/layer.ts'
 import type { ChangeRequest, FullLayer } from './api.ts'
 import { el } from './dom.ts'
 import { toLatLng } from './map.ts'
-
-// An object's name for lists: its title, or its entities, or its ID.
-export function describe(layer: Layer, object: LayerObject | undefined, id = object?.id): string {
-    if (!object) return id ?? ''
-    return (object.properties[layer.titleField] as string | undefined) || valuesOf(layer, object, 'entities').join(' / ') || id!
-}
+import type { Names } from './names.ts'
 
 const VERBS = { add: 'Add', update: 'Change', delete: 'Delete' }
 
-export function describeOp(data: FullLayer, op: Op): string {
-    const current = data.objects.find(o => o.id === opId(op))
-    return `${VERBS[op.op]} ${describe(data.layer, op.op === 'delete' ? current : op.object, opId(op))}`
+export function describeOp(names: Names, data: FullLayer, op: Op): string {
+    const object = op.op === 'delete' ? data.objects.find(o => o.id === op.id) : op.object
+    return `${VERBS[op.op]} ${(object && names.describe(data.layer, object)) || opId(op)}`
 }
 
 // The IDs of the objects a request changes that have changed since.
@@ -32,16 +27,21 @@ export const staleIds = (data: FullLayer, ops: Op[]) => ops.filter(op => {
     return !current || objectVersion(current) !== op.baseVersion
 }).map(opId)
 
-const show = (value: PropertyValue | undefined) =>
-    value === undefined ? '—' : Array.isArray(value) ? value.join(', ') : value === true ? 'Yes' : String(value)
+// A property's value as text, with entities and references by name.
+function show(names: Names, field: Field | undefined, value: PropertyValue | undefined): string {
+    if (value === undefined) return '—'
+    if (field?.type === 'entities' || field?.type === 'reference') return names.format(field, value)
+    return value === true ? 'Yes' : String(value)
+}
 
 // Polygons claimed by several entities are disputed, and can overlap.
 const disputed = (layer: Layer, o: LayerObject) => valuesOf(layer, o, 'entities').length > 1
 
 // Draw the request's changes on the map, and list them. Returns a function
 // that removes what it drew.
-export function showChanges(map: L.Map, data: FullLayer, request: ChangeRequest, list: HTMLElement): () => void {
+export function showChanges(map: L.Map, names: Names, data: FullLayer, request: ChangeRequest, list: HTMLElement): () => void {
     const { layer } = data
+    const field = (key: string) => layer.fields.find(f => f.key === key)
     const scale = DIMENSION_SCALE[layer.dimension]
     const group = L.featureGroup().addTo(map)
     const draw = (object: LayerObject | undefined, className: string) => {
@@ -74,11 +74,11 @@ export function showChanges(map: L.Map, data: FullLayer, request: ChangeRequest,
         const rows = op.op === 'delete' ? [] : changedFields(layer, before ?? { ...op.object, properties: {} }, op.object)
         const geometryChanged = JSON.stringify(before?.geometry ?? null) !== JSON.stringify(next?.geometry ?? null)
         const item = el('div', { class: 'change' }, [
-            el('div', { class: `change-title ${op.op}` }, describeOp(data, op)),
+            el('div', { class: `change-title ${op.op}` }, describeOp(names, data, op)),
             rows.length > 0 && el('table', {}, rows.map(r => el('tr', {}, [
                 el('th', {}, r.label),
-                before && el('td', { class: 'old' }, show(r.before)),
-                el('td', { class: 'new' }, show(r.after)),
+                before && el('td', { class: 'old' }, show(names, field(r.key), r.before)),
+                el('td', { class: 'new' }, show(names, field(r.key), r.after)),
             ]))),
             op.op !== 'delete' && geometryChanged && before && el('div', { class: 'muted' }, 'Shape changed'),
         ])
@@ -87,7 +87,8 @@ export function showChanges(map: L.Map, data: FullLayer, request: ChangeRequest,
         if (next && polygonParts(next.geometry).length && !next.properties.hidden && !disputed(layer, next)) {
             const others = neighbors.filter(n => n.id !== next.id)
             for (const w of borderWarnings(polygonParts(next.geometry), others)) {
-                const name = describe(layer, after.get(w.with))
+                const neighbor = after.get(w.with)
+                const name = (neighbor && names.describe(layer, neighbor)) || w.with
                 item.append(el('div', { class: 'warning' }, `${w.kind === 'overlap' ? 'Overlaps' : 'Leaves a gap with'} ${name} near ${w.at.map(Math.round).join(', ')}`))
                 L.circleMarker(toLatLng(w.at[0] * scale, w.at[1] * scale), { radius: 10, className: 'diff-warning', interactive: false }).addTo(group)
             }

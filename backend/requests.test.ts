@@ -77,8 +77,10 @@ test('invalid ops are refused', { skip }, async () => {
     assert.equal((await create([{ op: 'delete', id: 'ent_a', baseVersion: objectVersion(NATION) }])).status, 400) // its polygon lists it
     assert.equal((await create([{ op: 'delete', id: 'ent_a', baseVersion: 'old' }, { op: 'delete', id: 'pol_a', baseVersion: objectVersion(POLYGON) }])).status, 400)
     assert.equal((await create([{ op: 'add', object: { ...NATION, id: 'ent_b' } }])).status, 400) // duplicate name
-    // Renaming a nation leaves its polygon listing a missing entity.
-    assert.equal((await create([{ op: 'update', baseVersion: objectVersion(NATION), object: { ...NATION, properties: { name: 'B' } } }])).status, 400)
+    // Entities are listed by ID, not name.
+    assert.equal((await create([{ op: 'update', baseVersion: objectVersion(POLYGON), object: { ...POLYGON, properties: { entities: ['Adfelis'] } } }])).status, 400)
+    // So renaming a nation touches only the nation.
+    assert.equal((await create([{ op: 'update', baseVersion: objectVersion(NATION), object: { ...NATION, properties: { name: 'Emeraldia' } } }])).status, 201)
     assert.equal((await steve('/api/requests', { layerId: 'nope', title: 'x', ops: [recolor('#0000ff')] })).status, 400)
 
     const response = await create([{ op: 'delete', id: 'ent_a', baseVersion: objectVersion(NATION) }, { op: 'delete', id: 'pol_a', baseVersion: objectVersion(POLYGON) }])
@@ -112,7 +114,7 @@ test('approving one request makes others on the same object stale', { skip }, as
     }
     const first = await submit(recolor('#00ff00'))
     const second = await submit(recolor('#0000ff'))
-    const other = await submit({ op: 'update', baseVersion: objectVersion(POLYGON), object: { ...POLYGON, properties: { entities: ['Adfelis'], hidden: true } } })
+    const other = await submit({ op: 'update', baseVersion: objectVersion(POLYGON), object: { ...POLYGON, properties: { entities: ['ent_a'], hidden: true } } })
 
     await admin(`/api/requests/${first.id}/approve`, {})
     assert.equal((await (await steve(`/api/requests/${second.id}`)).json()).status, 'stale')
