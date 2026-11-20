@@ -147,12 +147,21 @@ a {
 
 /* Account */
 
-/* A box over the map, top right */
-.account {
+/* The account box and the editor panel, stacked over the map, top right */
+.corner {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-height: calc(100vh - 2rem);
+  max-width: calc(100vw - 2rem);
+}
+
+.account {
   max-width: 22rem;
   padding: 0.6rem 1rem;
   background: var(--col-darker);
@@ -223,16 +232,12 @@ a {
   margin-top: 0.25rem;
 }
 
-/* Editor panel: a box over the map, below the account box */
+/* Editor panel, below the account box */
 
 .panel {
-  position: fixed;
-  top: 4.5rem;
-  right: 1rem;
-  z-index: 9;
   width: 24rem;
-  max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 6rem);
+  max-width: 100%;
+  min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0.75rem 1rem 1rem;
