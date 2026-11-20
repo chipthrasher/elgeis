@@ -51,7 +51,7 @@ test("a commit that doesn't build is undone", () => {
         changed: new Map([['political', ['ent_a']]]),
         author: { name: 'Steve', email: 's@example.com' },
         message: 'Oops',
-    }), /Lists missing entity "Adfelis"/)
+    }), /Lists missing entity "ent_a"/)
     assert.equal(git(dir, 'rev-parse', 'HEAD'), before)
     assert.equal(git(dir, 'status', '--porcelain'), '')
     assert.equal(repo.data[0].objects.length, 2)

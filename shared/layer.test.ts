@@ -22,7 +22,7 @@ const portal = {
     type: 'Feature',
     id: 'pnt_abc12345',
     geometry: { type: 'Point', coordinates: [78, 428] },
-    properties: { name: 'Adfelis', wiki: 'https://wiki.elgeis.com/wiki/Adfelis', line: 'lin_xyz98765', entities: ['Emeraldia'] },
+    properties: { name: 'Adfelis', wiki: 'https://wiki.elgeis.com/wiki/Adfelis', line: 'lin_xyz98765', entities: ['ent_emeraldi'] },
 }
 
 test('newId makes prefixed random IDs', () => {
@@ -78,16 +78,17 @@ test('invalid objects fail', () => {
     props({ color: 'red' })
     props({ national: 'yes' })
     props({ line: 'Emeraldia' })
-    props({ entities: 'Emeraldia' })
+    props({ entities: 'ent_emeraldi' })
+    props({ entities: ['Emeraldia'] }) // by ID, not name
     props({ entities: [] })
     props({ hidden: 1 })
 })
 
 test('valuesOf lists references and entity names', () => {
     assert.deepEqual(valuesOf(layer, objects.parse(portal), 'reference'), ['lin_xyz98765'])
-    const disputed = { ...portal, properties: { line: ['lin_a', 'lin_b'], entities: ['Adfelis', 'Emeraldia'] } }
+    const disputed = { ...portal, properties: { line: ['lin_a', 'lin_b'], entities: ['ent_adfelis', 'ent_emeraldi'] } }
     assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'reference'), ['lin_a', 'lin_b'])
-    assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'entities'), ['Adfelis', 'Emeraldia'])
+    assert.deepEqual(valuesOf(layer, objects.parse(disputed), 'entities'), ['ent_adfelis', 'ent_emeraldi'])
 })
 
 test('text fields other than the title can be empty', () => {

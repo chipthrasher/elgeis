@@ -24,7 +24,7 @@ export const NATION: LayerObject = { type: 'Feature', id: 'ent_a', geometry: nul
 export const POLYGON: LayerObject = {
     type: 'Feature', id: 'pol_a',
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 0]]] },
-    properties: { entities: ['Adfelis'] },
+    properties: { entities: ['ent_a'] },
 }
 
 export function testRepo() {
