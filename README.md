@@ -48,5 +48,6 @@ It serves plain HTTP on `HTTP_PORT`. To put it on the internet:
 
 - **Use HTTPS.** Put it behind a reverse proxy or tunnel that terminates HTTPS, and set `SITE_URL` to the public `https://` address. Sign-in links and cookies are built from `SITE_URL`.
 - **Pass on the client's address.** Have your proxy send `X-Forwarded-For` and `X-Forwarded-Proto`, and list its address in `TRUSTED_PROXIES`. Otherwise every visitor looks like your proxy, and rate limits lump them together. The default, `private_ranges`, trusts localhost and private networks.
+- **Let the backend push the map data.** Put the private half of `elgeisdata`'s deploy key (one with write access) at `secrets/layers_deploy_key`, run `chmod 600 secrets/layers_deploy_key`, and set `LAYERS_REMOTE=git@github.com:chipthrasher/elgeisdata.git` in `.env`. The repo is cloned the first time the backend starts; if it already was over HTTPS, switch it with `docker compose exec backend git -C /data/repo remote set-url origin git@github.com:chipthrasher/elgeisdata.git`.
 - **Set up SPF and DKIM** for the domain that sign-in email comes from, or it will land in spam.
 - **Back up.** Approved map data is pushed to a git remote after every change. Copy the `backups` volume, which holds nightly Postgres dumps, off the machine regularly.

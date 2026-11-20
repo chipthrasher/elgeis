@@ -18,7 +18,7 @@ COPY index.html style.css favicon.png dynmap.jpg /srv/site/
 COPY --from=frontend /app/dist /srv/dist
 
 FROM node:22-alpine AS backend
-RUN apk add --no-cache git
+RUN apk add --no-cache git openssh-client
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

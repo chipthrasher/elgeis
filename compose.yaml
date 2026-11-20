@@ -23,7 +23,10 @@ services:
       LAYERS_REMOTE: ${LAYERS_REMOTE:-https://github.com/chipthrasher/elgeisdata.git}
       LAYERS_REPO: /data/repo
       LAYERS_BUILD: /data/built/layers
+      # Git over SSH uses the deploy key, and only trusts GitHub's real host key.
+      GIT_SSH_COMMAND: ssh -i /app/secrets/layers_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=/app/backend/known_hosts
     volumes:
+      - ./secrets:/app/secrets:ro
       - repo:/data/repo
       - built:/data/built
     depends_on:
