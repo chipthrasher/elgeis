@@ -20,7 +20,7 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       SMTP_URL: ${SMTP_URL:?Set SMTP_URL in .env}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in .env}
-      LAYERS_REMOTE: ${LAYERS_REMOTE:-}
+      LAYERS_REMOTE: ${LAYERS_REMOTE:-https://github.com/chipthrasher/elgeisdata.git}
       LAYERS_REPO: /data/repo
       LAYERS_BUILD: /data/built/layers
     volumes:

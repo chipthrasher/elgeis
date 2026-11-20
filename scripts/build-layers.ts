@@ -1,7 +1,7 @@
 // Builds the layer folders in layers/ into static JSON for the map:
 //
-//   layers/<id>/layer.json      the layer's manifest (name, dimension, schema)
-//   layers/<id>/<object>.json   one GeoJSON Feature per object
+//   <layers dir>/<id>/layer.json      the layer's manifest (name, dimension, schema)
+//   <layers dir>/<id>/<object>.json   one GeoJSON Feature per object
 //
 // becomes
 //
@@ -11,6 +11,7 @@
 // Everything is validated first, and nothing is written if anything is invalid.
 //
 // Usage: node scripts/build-layers.ts [layers dir] [output dir]
+// The layers dir defaults to data/layers, where `npm run layers` puts them.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -108,7 +109,7 @@ export function buildLayers(layersDir: string, outDir: string): LayerData[] {
 }
 
 if (import.meta.main) {
-    const [layersDir = 'layers', outDir = 'dist/layers'] = process.argv.slice(2)
+    const [layersDir = 'data/layers', outDir = 'dist/layers'] = process.argv.slice(2)
     try {
         const layers = buildLayers(layersDir, outDir)
         const count = layers.reduce((n, l) => n + l.objects.length, 0)

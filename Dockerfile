@@ -24,7 +24,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY shared shared
 COPY scripts scripts
-COPY layers layers
 COPY backend backend
 ENV NODE_ENV=production
 CMD ["node", "backend/main.ts"]

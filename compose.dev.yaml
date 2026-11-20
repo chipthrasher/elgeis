@@ -25,7 +25,6 @@ services:
       - ./backend:/app/backend:ro
       - ./shared:/app/shared:ro
       - ./scripts:/app/scripts:ro
-      - ./layers:/app/layers:ro
 
   mailpit:
     image: axllent/mailpit

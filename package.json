@@ -31,8 +31,9 @@
     "zod": "^4.6.7"
   },
   "scripts": {
-    "build": "node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
-    "dev": "node --watch-path=layers --watch-path=shared --watch-preserve-output scripts/build-layers.ts & esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
+    "layers": "git -C data/layers pull --ff-only || git clone https://github.com/chipthrasher/elgeisdata.git data/layers",
+    "build": "npm run layers && node scripts/build-layers.ts && esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file",
+    "dev": "npm run layers && node --watch-path=data/layers --watch-path=shared --watch-preserve-output scripts/build-layers.ts & esbuild src/main.ts --bundle --format=esm --outdir=dist --loader:.png=file --servedir=. --watch=forever",
     "lint": "eslint . && tsc",
     "test": "node --test 'shared/**/*.test.ts' 'scripts/**/*.test.ts' 'backend/**/*.test.ts'"
   }

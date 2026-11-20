@@ -9,42 +9,32 @@ import { initLayers } from './layers.ts'
 const git = (dir: string, ...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' })
 const commits = (repo: string) => git(repo, 'log', '--format=%s').trim().split('\n')
 
-function tmpDir(t: { after: (fn: () => void) => void }) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'layers-'))
-    t.after(() => fs.rmSync(dir, { recursive: true }))
-    return dir
-}
+test('initLayers clones the remote into an empty repo folder once, then builds it', t => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'layers-'))
+    t.after(() => fs.rmSync(tmp, { recursive: true }))
 
-test('without a remote, initLayers starts a repo from the bundled layers once, then builds it', t => {
-    const tmp = tmpDir(t)
-    const repo = path.join(tmp, 'repo')
-    const build = path.join(tmp, 'build')
-
-    const layers = initLayers(repo, 'layers', build)
-    assert.ok(layers.length > 0)
-    assert.ok(fs.existsSync(path.join(build, 'index.json')))
-    assert.deepEqual(commits(repo), ['Import the bundled layers'])
-
-    // A second start leaves the repo alone.
-    initLayers(repo, 'layers', build)
-    assert.equal(commits(repo).length, 1)
-})
-
-test('with a remote, initLayers clones it into an empty repo folder', t => {
-    const tmp = tmpDir(t)
-    // A stand-in for the remote, with the bundled layers at its root.
+    // A stand-in for the remote, with one empty layer.
     const remote = path.join(tmp, 'remote')
-    fs.cpSync('layers', remote, { recursive: true })
+    fs.mkdirSync(path.join(remote, 'test'), { recursive: true })
+    fs.writeFileSync(path.join(remote, 'test', 'layer.json'), JSON.stringify({
+        id: 'test', name: 'Test', dimension: 'overworld', titleField: 'name',
+        fields: [{ key: 'name', label: 'Name', type: 'text' }],
+    }))
     git(remote, 'init', '--quiet', '--initial-branch=main')
     git(remote, 'add', '--all')
     git(remote, '-c', 'user.name=A', '-c', 'user.email=a@example.com', 'commit', '--quiet', '--message=From the remote')
 
     const repo = path.join(tmp, 'repo')
+    const build = path.join(tmp, 'build')
     fs.mkdirSync(repo) // like an empty volume
-    const layers = initLayers(repo, 'no-bundled-layers', path.join(tmp, 'build'), remote)
-    assert.ok(layers.length > 0)
+    assert.deepEqual(initLayers(repo, build, remote).map(l => l.layer.id), ['test'])
+    assert.ok(fs.existsSync(path.join(build, 'test.json')))
     assert.deepEqual(commits(repo), ['From the remote'])
     assert.equal(git(repo, 'remote', 'get-url', 'origin').trim(), remote)
 
-    assert.throws(() => initLayers(path.join(tmp, 'other'), 'layers', path.join(tmp, 'build'), path.join(tmp, 'missing')), /git clone failed/)
+    // A second start leaves the repo alone, even if the remote is gone.
+    initLayers(repo, build, path.join(tmp, 'missing'))
+    assert.deepEqual(commits(repo), ['From the remote'])
+
+    assert.throws(() => initLayers(path.join(tmp, 'other'), build, path.join(tmp, 'missing')), /Command failed: git/)
 })
