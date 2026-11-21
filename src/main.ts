@@ -21,13 +21,14 @@ async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
     let openNewLayer = () => {}
-    createAccount(document.querySelector('#account')!, () => [linkButton('New layer', () => openNewLayer())], async user => {
+    createAccount(document.querySelector('#account')!, async user => {
         const editor = await ready
         // Reviewers, who are site admins and layer admins, get a link to
         // what's waiting for them, even when nothing is.
         const [waiting, layerInfos] = await Promise.all([api<unknown[]>('requests?review'), api<{ canAdmin: boolean }[]>('layers')])
         const reviews = user.role === 'admin' || layerInfos.some(l => l.canAdmin)
         return [
+            linkButton('New layer', () => openNewLayer()),
             linkButton('Edit', () => editor.home()),
             linkButton('Your changes', () => editor.myRequests()),
             reviews && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
