@@ -69,7 +69,7 @@ export function createCommunity({ map, control, layers, show, created }: Options
                 ])
             }),
             el('h3', {}, 'Make your own'),
-            el('p', { class: 'muted' }, "Once it's made, anyone can suggest things to add to it, and you decide what goes on."),
+            el('p', { class: 'muted' }, "Once it's made, anyone can suggest things to add to it, but only layer admins can approve them."),
             form,
         )
     }
