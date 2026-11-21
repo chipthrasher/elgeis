@@ -68,6 +68,11 @@ test("a layer's admins edit its schema and choose its other admins", { skip }, a
     assert.equal((await edit(steve, { ...schema, fields: [...schema.fields, { key: 'description', label: 'Description', type: 'flag' }] })).status, 400)
     assert.equal(git(dir, 'rev-parse', 'HEAD'), head)
 
+    // Saving without changing anything is fine, and makes no commit.
+    const untouched = git(dir, 'rev-parse', 'HEAD')
+    assert.equal((await edit(steve, { name: layer.name, titleField: 'name', fields: layer.fields })).status, 200)
+    assert.equal(git(dir, 'rev-parse', 'HEAD'), untouched)
+
     const updated = await json(await edit(steve, schema))
     assert.equal(updated.code, 200)
     assert.equal(updated.name, 'Public farms')

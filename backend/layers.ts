@@ -99,12 +99,14 @@ export class LayersRepo {
     }
 
     // Make changes to the files, commit them, and rebuild. Undoes it all if
-    // anything fails, like the build. Returns the commit's hash.
+    // anything fails, like the build. Returns the commit's hash, or if
+    // nothing changed, the current one.
     private commitFiles(author: Author, message: string, change: () => void): string {
         const head = git(this.dir, 'rev-parse', 'HEAD').trim()
         try {
             change()
             git(this.dir, 'add', '--all')
+            if (!git(this.dir, 'status', '--porcelain').trim()) return head
             git(this.dir, 'commit', '--quiet', `--author=${author.name} <${author.email}>`, `--message=${message}`)
             this.data = this.build()
         } catch (e) {
