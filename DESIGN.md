@@ -29,6 +29,7 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 - **Community layers are hidden by default.** The official layers (the political map and the Nether highway) show by default. To see a community layer, a viewer opens the list of community layers and enables it.
 - **The layers being viewed are stored in a URL param** (e.g. `?layers=political,nether,lay_3k9x2m`), so people can share custom views. This works alongside the existing `q` search param.
 - **Viewers choose which layers draw on top.** The layers control lists layers in the order they're stacked, top first, and they can be dragged (or moved with the arrow keys) into another order. `?layers=` lists them in that same order. Each layer is drawn in panes of its own, so a whole layer sits above or below another; within a layer, polygons are below lines, then names, then points. The dynmap image is always at the bottom.
+- **Where the map is looking is in the URL too:** `?x=&z=` is the block at the middle of the screen and `?zoom=` the zoom level, updated whenever the map stops moving and left out for the home view, so a shared link opens on the same spot.
 
 ## Change requests
 
