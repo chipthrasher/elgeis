@@ -42,8 +42,10 @@ test('anyone can create a community layer, and becomes its admin', { skip }, asy
     assert.equal(fs.existsSync(path.join(build, `${layer.id}.json`)), false)
     for (const viewer of [alex, browser()]) {
         assert.deepEqual((await (await viewer('/api/layers')).json()).map((l: { id: string }) => l.id), ['political']) // eslint-disable-line no-await-in-loop
+        assert.equal((await viewer(`/api/layers/${layer.id}`)).status, 404) // eslint-disable-line no-await-in-loop
     }
     assert.equal((await (await steve('/api/layers')).json()).find((l: { id: string }) => l.id === layer.id).pending, true)
+    assert.equal((await steve(`/api/layers/${layer.id}`)).status, 200)
     assert.equal((await steve(`/api/layers/${layer.id}/pending`, { approved: true })).status, 403)
     assert.equal((await approve(layer.id)).status, 200)
     assert.equal((await approve(layer.id)).status, 409)

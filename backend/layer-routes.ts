@@ -136,10 +136,13 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
         }))
     })
 
-    // A layer with its hidden objects, for the editor.
+    // A layer with its hidden objects, for the editor. Layers left out of the
+    // map, like those waiting for approval, only for their admins.
     app.get('/layers/:id', async c => {
         const data = find(c.req.param('id'))
-        return c.json({ ...data, canReview: await isLayerAdmin(db, c.get('user'), data.layer.id) })
+        const canReview = await isLayerAdmin(db, c.get('user'), data.layer.id)
+        if (repo.hidden.has(data.layer.id) && !canReview) throw fail(404, 'No such layer')
+        return c.json({ ...data, canReview })
     })
 
     /* Creating */

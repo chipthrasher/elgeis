@@ -8,7 +8,7 @@ import { createLayerControl, type Toggle } from './layer-control.ts'
 import { emailSettings } from './notifications.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
-import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
+import { addPanes, colorPolygons, loadLayers, loadPending, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
@@ -32,7 +32,9 @@ async function main() {
             user.role === 'admin' && linkButton('Moderate', () => editor.moderate()),
         ].filter((n): n is HTMLButtonElement => !!n)
     })
-    const allLayers = await loadLayers()
+    // Plus, for their admins, layers waiting for approval, to keep working on.
+    const [built, pending] = await Promise.all([loadLayers(), loadPending()])
+    const allLayers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const { map, dynmap } = createMap()
     addPanes(map, allLayers.map(l => l.layer.id))
