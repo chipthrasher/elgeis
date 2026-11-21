@@ -54,7 +54,7 @@ async function main() {
             editor.settings(l.layer.id)
         },
     })
-    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true, stacks: false }], community.browse)
+    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap Scrape', group: dynmap, byDefault: true, stacks: false }], community.browse)
     openNewLayer = community.openNew
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
