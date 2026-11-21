@@ -11,7 +11,10 @@
 
 :80 {
 	encode
-	header /dist/* Cache-Control no-cache
+	# Browsers check these on every load, so a deploy shows up at once rather
+	# than mixing new scripts with a cached old stylesheet.
+	@code path / /index.html /style.css /dist/*
+	header @code Cache-Control no-cache
 
 	handle /api* {
 		# The backend sees one address: the real client, as worked out above.
