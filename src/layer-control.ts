@@ -1,7 +1,7 @@
 // The layers control: the layers being viewed, each with a checkbox, listed in
 // the order they're stacked, top first. Drag a layer by its handle (or move it
 // with the arrow keys) to draw it above or below the others. Official layers
-// are always listed; community layers once they're turned on under "See more",
+// are always listed; community layers once they're turned on from "See more",
 // above the list. The dynmap image is always at the bottom.
 //
 // What's shown is kept in ?layers=, in the same order, top first, so views
@@ -24,8 +24,8 @@ export interface Toggle {
 
 export type LayerControl = ReturnType<typeof createLayerControl>
 
-// `more` gives what "See more" shows: the layers that aren't listed by default.
-export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => Promise<Node[]>) {
+// `more` opens what "See more" shows: the layers that aren't listed by default.
+export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => void) {
     const byId = (id: string) => toggles.find(t => t.id === id)
     const defaults = toggles.filter(t => t.stacks && t.byDefault)
     // What can't be stacked is listed below the rest, in a fixed order.
@@ -56,16 +56,10 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => Pr
 
     /* The list */
 
-    // "See more" opens a list above the layers, which stays open while they change.
-    const moreBox = el('div', { class: 'more' })
     const moreButton = el('button', { type: 'button', class: 'see-more' }, 'See more')
-    moreButton.addEventListener('click', async () => {
-        const open = moreBox.childElementCount > 0
-        moreBox.replaceChildren(...open ? [] : await more())
-        moreButton.textContent = open ? 'See more' : 'See less'
-    })
+    moreButton.addEventListener('click', more)
     const rows = el('div')
-    const container = el('div', { class: 'leaflet-control-layers leaflet-control-layers-expanded layer-control' }, [moreButton, moreBox, rows])
+    const container = el('div', { class: 'leaflet-control-layers leaflet-control-layers-expanded layer-control' }, [moreButton, rows])
 
     function render() {
         rows.replaceChildren(...order.map(t => row(t, true)), ...fixed.map(t => row(t, false)))

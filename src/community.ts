@@ -1,5 +1,5 @@
 // Community layers: every layer that isn't official. They're hidden until a
-// viewer turns them on under "See more" in the layers control, which adds them
+// viewer finds and turns them on from "See more" in the layers control, which adds them
 // to the top of its list (and so to ?layers=). Anyone signed in can make a new
 // one with "New layer", and becomes its admin.
 
@@ -53,27 +53,57 @@ export function createCommunity({ map, control, layers, show, created }: Options
         )
     }
 
-    // What "See more" in the layers control lists: each community layer, to
-    // turn on or off, with its admins on the right.
-    async function seeMore(): Promise<Node[]> {
-        const list = layers.filter(l => !l.layer.official)
+    // "See more" in the layers control: a window listing every community
+    // layer, to search and turn on or off, with its admins and description.
+    async function browse() {
         // Who runs each layer, from the backend. Left out if it can't be reached.
         const infos = await api<LayerInfo[]>('layers').catch(() => [])
         const adminsOf = (layerId: string) => infos.find(i => i.id === layerId)?.admins ?? []
-        return [
-            ...list.length ? list.map(l => {
+        const list = layers.filter(l => !l.layer.official)
+            .sort((a, b) => a.layer.name.localeCompare(b.layer.name))
+            .map(l => {
+                const admins = adminsOf(l.layer.id)
                 const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
                 box.addEventListener('change', () => control().setShown(l.layer.id, box.checked))
-                const admins = adminsOf(l.layer.id)
-                return el('label', { class: 'more-row', 'data-id': l.layer.id, title: l.layer.description ?? '' }, [
+                const node = el('label', { class: 'browse-row' }, [
                     box,
-                    el('span', {}, l.layer.name),
-                    admins.length > 0 && el('span', { class: 'admins' }, admins.join(', ')),
+                    el('span', { class: 'browse-text' }, [
+                        el('span', { class: 'browse-head' }, [
+                            el('span', { class: 'browse-name' }, l.layer.name),
+                            admins.length > 0 && el('span', { class: 'admins' }, `${admins.length === 1 ? 'Admin' : 'Admins'}: ${admins.join(', ')}`),
+                        ]),
+                        l.layer.description && el('small', {}, l.layer.description),
+                    ]),
                 ])
-            }) : [el('div', { class: 'muted' }, 'No community layers yet.')],
-            button('Make a new layer', openNew, 'see-more'),
-        ]
+                return { node, text: [l.layer.name, l.layer.description, ...admins].join('\n').toLowerCase() }
+            })
+
+        const search = el('input', { type: 'search', placeholder: 'Search by name, description, or admin' })
+        const none = el('p', { class: 'muted' }, list.length ? 'No layers match.' : 'No community layers yet.')
+        const filter = () => {
+            const query = search.value.trim().toLowerCase()
+            for (const { node, text } of list) node.hidden = !text.includes(query)
+            none.hidden = list.some(({ node }) => !node.hidden)
+        }
+        search.addEventListener('input', filter)
+
+        const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Community layers' })
+        const close = () => dialog.close()
+        dialog.append(
+            el('div', { class: 'panel-head' }, [el('h2', {}, 'Community layers'), button('×', close, 'link close')]),
+            el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to add them to the map.'),
+            search,
+            el('div', { class: 'browse-list' }, [...list.map(l => l.node), none]),
+            el('div', { class: 'row' }, button('Make a new layer', () => { close(); openNew() }, 'link')),
+        )
+        // Clicks outside the window land on the dialog itself, behind it.
+        dialog.addEventListener('click', e => { if (e.target === dialog) close() })
+        dialog.addEventListener('close', () => dialog.remove())
+        filter()
+        document.body.append(dialog)
+        dialog.showModal()
+        search.focus()
     }
 
-    return { openNew, seeMore }
+    return { openNew, browse }
 }

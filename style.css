@@ -571,8 +571,7 @@ a {
   min-width: 0;
 }
 
-/* "See more" in the layers control: community layers to turn on, each with
-   its admins on the right */
+/* "See more" in the layers control, which opens the community layers window */
 .layer-control .see-more {
   font: inherit;
   font-size: 0.85em;
@@ -584,31 +583,67 @@ a {
   cursor: pointer;
 }
 
-.layer-control .more {
-  max-height: 40vh;
+/* The community layers window: a dialog styled like the editor panel */
+dialog.browse {
+  width: min(32rem, calc(100vw - 2rem));
+  border: none;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.browse:not([open]) {
+  display: none;
+}
+
+dialog.browse::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+dialog.browse .browse-list {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  margin: 0.5rem 0;
 }
 
-.layer-control .more:not(:empty) {
-  margin: 0.3rem 0 0.4rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 0.1rem solid var(--col-dark);
-}
-
-.layer-control .more-row {
+dialog.browse .browse-row {
   display: flex;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 0.1rem solid var(--col-dark);
+  cursor: pointer;
 }
 
-.layer-control .more-row .admins {
+dialog.browse .browse-row[hidden] {
+  display: none;
+}
+
+dialog.browse .browse-text {
+  flex: 1;
+  min-width: 0;
+}
+
+dialog.browse .browse-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+dialog.browse .browse-name {
+  color: var(--col-lightest);
+}
+
+dialog.browse .admins {
   margin-left: auto;
-  padding-left: 0.75rem;
-  font-size: 0.8em;
+  text-align: right;
+  font-size: 0.8rem;
   color: var(--col-light);
 }
 
-.layer-control .more .muted {
+dialog.browse small {
+  display: block;
   color: var(--col-light);
 }
 
