@@ -19,6 +19,9 @@ export interface AppOptions {
     // How many changes each address can make to the API a minute, or false
     // for no limit. Limited in production.
     rateLimit?: typeof RATE_LIMIT | false
+    // The site's own address (MAIL_FROM), which hears about new layers
+    // waiting for approval.
+    mailFrom?: string
 }
 
 export function createApp(auth: Auth, db: Db, repo: LayersRepo, siteUrl: string, options: AppOptions = {}) {
@@ -27,7 +30,7 @@ export function createApp(auth: Auth, db: Db, repo: LayersRepo, siteUrl: string,
     app.get('/', c => c.json({ hello: 'Elgeis' }))
     app.on(['GET', 'POST'], '/auth/*', c => auth.handler(c.req.raw))
 
-    const deps = { db, repo, siteUrl, serially: queue() }
+    const deps = { db, repo, siteUrl, serially: queue(), secret: auth.options.secret!, mailFrom: options.mailFrom }
     const requests = requestRoutes(deps)
     const api = new Hono<Env>()
     if (limits) api.use(rateLimit(db, limits))
@@ -54,11 +57,11 @@ if (import.meta.main) {
 
     const hidden = await db.selectFrom('layer').select('id').where('hidden', '=', true).execute()
     const repo = new LayersRepo(env.LAYERS_REPO!, env.LAYERS_BUILD!, env.LAYERS_REMOTE!, new Set(hidden.map(l => l.id)))
-    // Banned accounts' layers too, which needs to know which are official.
+    // Pending layers, and banned accounts', too, which needs to know which are official.
     await hideLayers(db, repo)
     const sendMail = createMailer(env.SMTP_URL!, env.MAIL_FROM!)
     const auth = createAuth(db, { siteUrl: env.SITE_URL!, secret: env.BETTER_AUTH_SECRET!, sendMail })
-    const { app, reconcile } = createApp(auth, db, repo, env.SITE_URL!)
+    const { app, reconcile } = createApp(auth, db, repo, env.SITE_URL!, { mailFrom: env.MAIL_FROM })
     // Also gives every layer in the repo a row, for its admins and change requests.
     await reconcile()
     // Pick up edits made to the layers remote directly.

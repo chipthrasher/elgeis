@@ -16,17 +16,23 @@ import { fail, parseBody, type Env } from './http.ts'
 
 export type SendMail = (to: string, subject: string, text: string, headers?: Record<string, string>) => Promise<void>
 
+// Signatures for links in emails, which work without signing in. Each
+// message says what its link is for, so a link can't be used for anything else.
+export const sign = (secret: string, message: string) => createHmac('sha256', secret).update(message).digest('base64url')
+export function signed(secret: string, message: string, signature: string) {
+    const expected = Buffer.from(sign(secret, message))
+    const given = Buffer.from(signature)
+    return given.length === expected.length && timingSafeEqual(given, expected)
+}
+
 // Tokens never expire, like most unsubscribe links. All one can do is change
 // whether its user gets notifications.
-const sign = (secret: string, userId: string) => createHmac('sha256', secret).update('email-settings:' + userId).digest('base64url')
-export const settingsToken = (secret: string, userId: string) => `${Buffer.from(userId).toString('base64url')}.${sign(secret, userId)}`
+export const settingsToken = (secret: string, userId: string) => `${Buffer.from(userId).toString('base64url')}.${sign(secret, 'email-settings:' + userId)}`
 
 function userFromToken(secret: string, token: string): string | null {
     const [id, signature = ''] = token.split('.')
     const userId = Buffer.from(id, 'base64url').toString()
-    const expected = Buffer.from(sign(secret, userId))
-    const given = Buffer.from(signature)
-    return given.length === expected.length && timingSafeEqual(given, expected) ? userId : null
+    return signed(secret, 'email-settings:' + userId, signature) ? userId : null
 }
 
 // Where someone changes whether they get notifications: the map, which opens
@@ -67,18 +73,23 @@ export async function notify(db: Db, userIds: string[], subject: string, text: s
     if (wanted.length) await db.insertInto('emailQueue').values(wanted.map(u => ({ userId: u.id, subject, text }))).execute()
 }
 
-// Send what's waiting, oldest first, each with a link to its recipient's
+// Queue an email to an address, like the site's own.
+export async function notifyAddress(db: Db, to: string, subject: string, text: string) {
+    await db.insertInto('emailQueue').values({ to, subject, text }).execute()
+}
+
+// Send what's waiting, oldest first, each to a user with a link to their
 // settings. Runs every few seconds.
 export async function sendQueued(db: Db, sendMail: SendMail, linkFor: (userId: string) => string) {
     const waiting = await db.selectFrom('emailQueue')
-        .innerJoin('user', 'user.id', 'emailQueue.userId')
-        .select(['emailQueue.id', 'emailQueue.userId', 'user.email', 'subject', 'text'])
+        .leftJoin('user', 'user.id', 'emailQueue.userId')
+        .select(eb => ['emailQueue.id', 'emailQueue.userId', eb.fn.coalesce('emailQueue.to', 'user.email').as('email'), 'subject', 'text'])
         .where('sentAt', 'is', null).where('attempts', '<', MAX_ATTEMPTS)
         .orderBy('emailQueue.id').limit(50).execute()
     for (const mail of waiting) {
         try {
-            const link = linkFor(mail.userId)
-            await sendMail(mail.email, mail.subject, `${mail.text}\n--\nTo stop these emails: ${link}\n`, { 'List-Unsubscribe': `<${link}>` }) // eslint-disable-line no-await-in-loop
+            const link = mail.userId && linkFor(mail.userId)
+            await sendMail(mail.email!, mail.subject, link ? `${mail.text}\n--\nTo stop these emails: ${link}\n` : mail.text, link ? { 'List-Unsubscribe': `<${link}>` } : undefined) // eslint-disable-line no-await-in-loop
             await db.updateTable('emailQueue').set({ sentAt: new Date() }).where('id', '=', mail.id).execute() // eslint-disable-line no-await-in-loop
         } catch (e) {
             await db.updateTable('emailQueue') // eslint-disable-line no-await-in-loop

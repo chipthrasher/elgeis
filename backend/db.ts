@@ -43,6 +43,9 @@ export interface Database {
         createdAt: Generated<Date>
         // Hidden by a site admin: left out of the community layer list.
         hidden: Generated<boolean>
+        // Made by someone new, and waiting for a site admin's approval
+        // before it's in the community layer list.
+        pending: Generated<boolean>
     }
     layerAdmin: {
         layerId: string
@@ -74,7 +77,9 @@ export interface Database {
     // Email notifications waiting to be sent (see notify.ts).
     emailQueue: {
         id: Generated<number>
-        userId: string
+        // Who it's for: a user, or else an address.
+        userId: string | null
+        to: string | null
         subject: string
         text: string
         createdAt: Generated<Date>

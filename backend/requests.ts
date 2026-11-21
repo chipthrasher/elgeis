@@ -32,6 +32,10 @@ export interface Deps {
     repo: LayersRepo
     siteUrl: string
     serially: Serially
+    // For signing links in emails.
+    secret: string
+    // The site's own address, which hears about layers waiting for approval.
+    mailFrom?: string
 }
 
 // A commit author for a user. The repo is public, so authors get a stand-in
