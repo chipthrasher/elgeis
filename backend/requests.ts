@@ -9,7 +9,7 @@ import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { checkOps, MAX_OPEN_REQUESTS, OPEN_STATUSES, opId, RequestBody, type Op, type Status } from '../shared/changes.ts'
-import type { Auth } from './auth.ts'
+import { USERNAME_CHARS, type Auth } from './auth.ts'
 import type { Db } from './db.ts'
 import type { LayersRepo } from './layers.ts'
 import type { LayerObject } from '../shared/layer.ts'
@@ -26,8 +26,13 @@ const fail = (status: 400 | 401 | 403 | 404 | 409, message: string) => new HTTPE
 
 // The ID of the request a commit was made for, and who approved it, are kept
 // as trailers at the end of its message.
-const TRAILER = /^Change-Request: (\d+)$/m
-const APPROVER = /^Approved-By: (.+)$/m
+// A display name that's safe as a commit author (older ones weren't checked).
+const safeName = (name: string | null) => name && USERNAME_CHARS.test(name) ? name : null
+
+// Trailers end a message, so they're read from the end, past anything the
+// title might hold.
+const trailer = (message: string, key: string) =>
+    message.trim().split('\n').reverse().find(line => line.startsWith(key + ': '))?.slice(key.length + 2)
 
 export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: string) {
     const app = new Hono<Env>()
@@ -281,8 +286,8 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
             changed: new Map([[request.layerId, ops.map(opId)]]),
             // The repo is public, so authors get a stand-in address rather
             // than their real one.
-            author: { name: author.displayUsername ?? author.username!, email: `${author.username}@users.noreply.${new URL(siteUrl).hostname}` },
-            message: `${request.title || 'Change request'}\n\nApproved by ${reviewer.username}.\n\nChange-Request: ${request.id}\nApproved-By: ${reviewer.username}\n`,
+            author: { name: safeName(author.displayUsername) ?? author.username!, email: `${author.username}@users.noreply.${new URL(siteUrl).hostname}` },
+            message: `${request.title.replace(/\s+/g, ' ').trim() || 'Change request'}\n\nApproved by ${reviewer.username}.\n\nChange-Request: ${request.id}\nApproved-By: ${reviewer.username}\n`,
         })
         await setStatus(request.id, 'approved', { reviewedBy: reviewer.id, reviewedAt: new Date(), commit })
         await markStale()
@@ -309,8 +314,8 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
                 console.error((e as Error).message)
             }
             for (const { hash, message } of repo.recentCommits(50)) {
-                const id = message.match(TRAILER)?.[1]
-                if (!id) continue
+                const id = trailer(message, 'Change-Request')
+                if (!id || !/^\d+$/.test(id)) continue
                 const request = await db.selectFrom('changeRequest').select(['status', 'commit']).where('id', '=', Number(id)).executeTakeFirst() // eslint-disable-line no-await-in-loop
                 if (!request) continue
                 // Pulling in the remote's edits moves our unpushed commits.
@@ -318,7 +323,7 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
                     if (request.commit !== hash) await db.updateTable('changeRequest').set({ commit: hash }).where('id', '=', Number(id)).execute() // eslint-disable-line no-await-in-loop
                     continue
                 }
-                const reviewer = await db.selectFrom('user').select('id').where('username', '=', message.match(APPROVER)?.[1] ?? '').executeTakeFirst() // eslint-disable-line no-await-in-loop
+                const reviewer = await db.selectFrom('user').select('id').where('username', '=', trailer(message, 'Approved-By') ?? '').executeTakeFirst() // eslint-disable-line no-await-in-loop
                 await setStatus(Number(id), 'approved', { reviewedBy: reviewer?.id ?? null, reviewedAt: new Date(), commit: hash }) // eslint-disable-line no-await-in-loop
                 console.log(`Marked change request ${id} approved, from commit ${hash}`)
             }

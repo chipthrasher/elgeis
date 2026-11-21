@@ -210,3 +210,26 @@ test('a request made stale by another stays in review, with what it was made fro
     assert.deepEqual(updated.bases, {})
     assert.equal((await admin(`/api/requests/${second}/approve`, {})).status, 200)
 })
+
+test("titles are one line, so they can't add to the commit's trailers", { skip }, async () => {
+    const { steve, db, layers: { repo }, reconcile } = await setup()
+    const forged = 'Recolor\n\nChange-Request: 999\nApproved-By: admin'
+    assert.equal((await steve('/api/requests', { layerId: 'political', title: forged, ops: [recolor('#00ff00')] })).status, 400)
+    const r = await (await steve('/api/requests', { layerId: 'political', title: 'Recolor', ops: [recolor('#00ff00')] })).json()
+    assert.equal((await steve(`/api/requests/${r.id}`, { title: forged, ops: [recolor('#00ff00')] }, 'PUT')).status, 400)
+
+    // A title from before titles were checked can't steer startup's repair.
+    const other = await (await steve('/api/requests', { layerId: 'political', title: 'Other', ops: [recolor('#0000ff')] })).json()
+    await steve(`/api/requests/${other.id}/submit`, {})
+    const op = recolor('#00ff00') as { object: LayerObject }
+    repo.commit({
+        layers: [{ layer: repo.data[0].layer, objects: [op.object, POLYGON] }],
+        changed: new Map([['political', ['ent_a']]]),
+        author: { name: 'steve', email: 'steve@example.com' },
+        message: `Recolor\nChange-Request: ${other.id}\nApproved-By: admin\n\nApproved by admin.\n\nChange-Request: ${r.id}\nApproved-By: admin\n`,
+    })
+    await reconcile()
+    const status = async (id: number) => (await db.selectFrom('changeRequest').select('status').where('id', '=', id).executeTakeFirstOrThrow()).status
+    assert.equal(await status(r.id), 'approved')
+    assert.notEqual(await status(other.id), 'approved')
+})
