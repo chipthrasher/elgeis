@@ -247,6 +247,13 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
     // reconcile() finishes the job on the next start.
     async function approve(request: Request, reviewer: User) {
         const { ops } = request
+        // Start from the remote's latest, so this doesn't undo or fork from
+        // edits made there.
+        try {
+            if (repo.sync()) await markStale()
+        } catch (e) {
+            throw fail(409, (e as Error).message)
+        }
         const result = checkOps(repo.data, request.layerId, ops)
         if (result.stale.length) {
             await setStatus(request.id, 'stale')
@@ -276,15 +283,27 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         if (stale.length) await db.updateTable('changeRequest').set({ status: 'stale', updatedAt: new Date() }).where('id', 'in', stale).execute()
     }
 
-    // Mark requests that were committed but never marked approved, which
-    // happens if the backend stops between the two.
+    // Catch up with the repo: pull in edits made to the remote, and mark
+    // requests that were committed but never marked approved, which happens
+    // if the backend stops between the two. Runs at startup and every few
+    // minutes.
     async function reconcile() {
         await serially(async () => {
+            try {
+                repo.sync()
+            } catch (e) {
+                console.error((e as Error).message)
+            }
             for (const { hash, message } of repo.recentCommits(50)) {
                 const id = message.match(TRAILER)?.[1]
                 if (!id) continue
-                const request = await db.selectFrom('changeRequest').select('status').where('id', '=', Number(id)).executeTakeFirst() // eslint-disable-line no-await-in-loop
-                if (!request || request.status === 'approved') continue
+                const request = await db.selectFrom('changeRequest').select(['status', 'commit']).where('id', '=', Number(id)).executeTakeFirst() // eslint-disable-line no-await-in-loop
+                if (!request) continue
+                // Pulling in the remote's edits moves our unpushed commits.
+                if (request.status === 'approved') {
+                    if (request.commit !== hash) await db.updateTable('changeRequest').set({ commit: hash }).where('id', '=', Number(id)).execute() // eslint-disable-line no-await-in-loop
+                    continue
+                }
                 const reviewer = await db.selectFrom('user').select('id').where('username', '=', message.match(APPROVER)?.[1] ?? '').executeTakeFirst() // eslint-disable-line no-await-in-loop
                 await setStatus(Number(id), 'approved', { reviewedBy: reviewer?.id ?? null, reviewedAt: new Date(), commit: hash }) // eslint-disable-line no-await-in-loop
                 console.log(`Marked change request ${id} approved, from commit ${hash}`)

@@ -164,3 +164,23 @@ test('on startup, requests committed but not marked approved are marked', { skip
     assert.equal(request.commit, git(dir, 'rev-parse', 'HEAD').trim())
     assert.ok(request.reviewedBy)
 })
+
+test("approving pulls in the remote's edits first, so it doesn't overwrite them", { skip }, async () => {
+    const { steve, admin, db, layers: { remote, repo }, reconcile } = await setup()
+    const r = await (await steve('/api/requests', { layerId: 'political', title: 'Recolor', ops: [recolor('#00ff00')] })).json()
+    await steve(`/api/requests/${r.id}/submit`, {})
+
+    // Someone edits the same nation on the remote by hand.
+    fs.writeFileSync(path.join(remote, 'political', 'ent_a.json'), formatJson({ ...NATION, properties: { ...NATION.properties, color: '#0000ff' } }))
+    git(remote, 'add', '--all')
+    git(remote, '-c', 'user.name=B', '-c', 'user.email=b@example.com', 'commit', '--quiet', '--message=By hand')
+
+    assert.equal((await admin(`/api/requests/${r.id}/approve`, {})).status, 409)
+    assert.equal(repo.data[0].objects.find(o => o.id === 'ent_a')!.properties.color, '#0000ff')
+    const request = await db.selectFrom('changeRequest').select('status').where('id', '=', r.id).executeTakeFirstOrThrow()
+    assert.equal(request.status, 'stale')
+
+    // Catching up again finds nothing new.
+    await reconcile()
+    assert.equal(git(remote, 'log', '-1', '--format=%s').trim(), 'By hand')
+})

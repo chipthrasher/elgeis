@@ -3,7 +3,9 @@
 //
 // On a fresh install the repo volume is empty, so the repo starts as a clone
 // of the remote (LAYERS_REMOTE). Each approved change request becomes one
-// commit, which is built and then pushed back to the remote.
+// commit, which is built and then pushed back to the remote. Commits made to
+// the remote some other way (by hand, or a merged pull request) are pulled in
+// by sync().
 
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -63,6 +65,41 @@ export class LayersRepo {
             throw e
         }
         return git(this.dir, 'rev-parse', 'HEAD').trim()
+    }
+
+    // Pull in commits made to the remote some other way, putting ours that
+    // haven't been pushed yet on top, and rebuild. Returns whether anything
+    // came in. Carries on as it is if the remote can't be reached; throws,
+    // changing nothing, if the remote's commits conflict with ours or don't
+    // build.
+    sync(): boolean {
+        try {
+            git(this.dir, 'fetch', '--quiet', 'origin')
+        } catch (e) {
+            console.error('Fetching the layers repo failed:', (e as { stderr?: string }).stderr || (e as Error).message)
+            return false
+        }
+        if (!git(this.dir, 'rev-list', 'HEAD..@{upstream}').trim()) return false
+
+        const head = git(this.dir, 'rev-parse', 'HEAD').trim()
+        const undo = (problem: string) => {
+            try { git(this.dir, 'rebase', '--abort') } catch { /* not mid-rebase */ }
+            git(this.dir, 'reset', '--quiet', '--hard', head)
+            this.data = buildLayers(this.dir, this.buildDir)
+            return new Error(`The layers repo's remote has commits that ${problem}, so they weren't pulled in. ` +
+                `Fix the remote, or rebase this site's repo onto it by hand.`)
+        }
+        try {
+            git(this.dir, 'rebase', '--quiet', '@{upstream}')
+        } catch {
+            throw undo("conflict with this site's unpushed changes")
+        }
+        try {
+            this.data = buildLayers(this.dir, this.buildDir)
+        } catch (e) {
+            throw undo(`don't build (${(e as Error).message})`)
+        }
+        return true
     }
 
     // Push to the remote. A failed push is retried with the next commit, so

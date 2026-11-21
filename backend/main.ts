@@ -41,6 +41,8 @@ if (import.meta.main) {
     })
     const { app, reconcile } = createApp(auth, db, repo, env.SITE_URL!)
     await reconcile()
+    // Pick up edits made to the layers remote directly.
+    setInterval(() => reconcile().catch(e => console.error('Catching up with the layers repo failed:', e)), 5 * 60 * 1000)
     const port = Number(env.PORT ?? 3000)
     serve({ fetch: app.fetch, port }, () => console.log(`Listening on port ${port}`))
 }
