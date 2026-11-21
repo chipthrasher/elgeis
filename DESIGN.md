@@ -32,7 +32,7 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 
 - **Any account can submit** a change request to any layer. Nothing goes live until a layer admin approves it, so open submission is low-risk.
 - **Each account can have at most 10 open change requests** at once.
-- **A change request is a list of operations:** `add`, `update`, or `delete`. Each operation records the version of the object it changes (`baseVersion`). If that object changes before the request is approved, the request goes stale and the author has to update it. An object's version is a hash of its formatted JSON, so the browser and the backend work it out the same way.
+- **A change request is a list of operations:** `add`, `update`, or `delete`. Each operation records the version of the object it changes (`baseVersion`). If that object changes before the request is approved, the request goes stale and the author has to update it. A stale request that was submitted stays in reviewers' queue, marked as waiting on its author. To update it, the author sees each changed object merged field by field with its newer version, where the shape counts as one field. A field only one side changed takes that side's value, and the author picks where both changed the same field. The object as it was when the request was made comes from the layers repo's history. An object's version is a hash of its formatted JSON, so the browser and the backend work it out the same way.
 - **Admins review on the map.** The old shape shows in red and the new one in green, with a list of changed properties beside it. They don't read a text diff of coordinates.
 
 ## Data format

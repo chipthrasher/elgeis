@@ -12,6 +12,7 @@ import { checkOps, MAX_OPEN_REQUESTS, OPEN_STATUSES, opId, RequestBody, type Op,
 import type { Auth } from './auth.ts'
 import type { Db } from './db.ts'
 import type { LayersRepo } from './layers.ts'
+import type { LayerObject } from '../shared/layer.ts'
 
 export interface User {
     id: string
@@ -94,8 +95,18 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
             reviewedBy: r.reviewedBy && (names.get(r.reviewedBy) ?? null),
             reviewedAt: r.reviewedAt,
             commit: r.commit,
+            // For an open request whose objects have changed since, those
+            // objects as they were when it was made, so it can be merged.
+            bases: full && OPEN_STATUSES.includes(r.status) ? bases(r) : {},
             comments: comments.map(cm => ({ author: names.get(cm.authorId) ?? null, body: cm.body, createdAt: cm.createdAt })),
         }
+    }
+
+    function bases(r: Request): Record<string, LayerObject | null> {
+        const stale = new Set(checkOps(repo.data, r.layerId, r.ops).stale)
+        return Object.fromEntries(r.ops.flatMap(op => op.op !== 'add' && stale.has(opId(op))
+            ? [[opId(op), repo.findVersion(r.layerId, opId(op), op.baseVersion)]]
+            : []))
     }
 
     // Load a request the current user wrote and can still change.
@@ -135,12 +146,15 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
     /* Listing and reading */
 
     // ?mine lists your own requests; ?review lists submitted requests on the
-    // layers you review.
+    // layers you review, and those waiting on their authors to update them.
     app.get('/requests', async c => {
         const user = signedIn(c)
         let query = db.selectFrom('changeRequest').selectAll().orderBy('updatedAt', 'desc').limit(100)
         if (c.req.query('review') !== undefined) {
-            query = query.where('status', '=', 'submitted')
+            query = query.where(eb => eb.or([
+                eb('status', '=', 'submitted'),
+                eb.and([eb('status', '=', 'stale'), eb('submittedAt', 'is not', null)]),
+            ]))
             if (user.role !== 'admin') {
                 query = query.where('layerId', 'in', db.selectFrom('layerAdmin').select('layerId').where('userId', '=', user.id))
             }

@@ -32,8 +32,8 @@ export const staleIds = (data: FullLayer, ops: Op[]) => ops.filter(op => {
 }).map(opId)
 
 // A property's value as text, with entities and references by name.
-function show(names: Names, field: Field | undefined, value: PropertyValue | undefined): string {
-    if (value === undefined) return '—'
+export function showValue(names: Names, field: Field | undefined, value: PropertyValue | undefined): string {
+    if (value === undefined || value === '') return '—'
     if (field?.type === 'entities' || field?.type === 'reference') return names.format(field, value)
     return value === true ? 'Yes' : String(value)
 }
@@ -95,8 +95,8 @@ export function showChanges(map: L.Map, layers: MapLayer[], index: ObjectIndex, 
                 before && el('tr', { class: 'heading' }, [el('th'), el('th', {}, 'Before'), el('th', {}, 'After')]),
                 ...rows.map(r => el('tr', {}, [
                     el('th', {}, r.label),
-                    before && el('td', { class: 'old' }, show(names, field(r.key), r.before)),
-                    el('td', { class: 'new' }, show(names, field(r.key), r.after)),
+                    before && el('td', { class: 'old' }, showValue(names, field(r.key), r.before)),
+                    el('td', { class: 'new' }, showValue(names, field(r.key), r.after)),
                 ])),
             ]),
             op.op !== 'delete' && geometryChanged && before && el('div', { class: 'muted' }, 'Shape changed'),
