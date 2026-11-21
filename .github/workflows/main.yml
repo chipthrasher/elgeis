@@ -28,3 +28,43 @@ jobs:
       env:
         DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
     - run: npm run build
+
+  # On main, once CI passes, tag a release if any commit since the last tag
+  # calls for one, going by Conventional Commits: a breaking change ("feat!:"
+  # or a "BREAKING CHANGE:" footer) bumps the major version, "feat" the minor,
+  # and "fix" or "perf" the patch. Anything else (docs, chore, ...) tags nothing.
+  release:
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Tag the next version
+      run: |
+        # The highest version tag, with or without a "v".
+        last=$(git tag --list | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sed -E 's/^v?(.*)/\1 &/' | sort -V | tail -n 1 | cut -d' ' -f2)
+        log=$(git log --format=%B ${last:+$last..}HEAD)
+        if grep -qE '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE:' <<<"$log"; then bump=major
+        elif grep -qE '^feat(\([^)]*\))?:' <<<"$log"; then bump=minor
+        elif grep -qE '^(fix|perf)(\([^)]*\))?:' <<<"$log"; then bump=patch
+        else echo "Nothing to release since ${last:-the start}"; exit 0
+        fi
+
+        # Keep whatever prefix the last tag had, "v" or none.
+        prefix=${last%%[0-9]*}
+        IFS=. read -r major minor patch <<<"${last#"$prefix"}"
+        major=${major:-0} minor=${minor:-0} patch=${patch:-0}
+        case $bump in
+          major) next=$((major + 1)).0.0 ;;
+          minor) next=$major.$((minor + 1)).0 ;;
+          patch) next=$major.$minor.$((patch + 1)) ;;
+        esac
+
+        echo "$bump: ${last:-none} -> $prefix$next"
+        git tag "$prefix$next"
+        git push origin "$prefix$next"
