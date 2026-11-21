@@ -530,6 +530,53 @@ a {
   white-space: pre-line;
 }
 
+.panel .notice {
+  color: var(--col-pastel-green);
+}
+
+.panel h3 {
+  font-size: 1rem;
+  color: var(--col-lightest);
+  margin: 1.25rem 0 0.25rem;
+}
+
+/* Layer settings: one block per field in the schema */
+
+.panel .schema-field {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border: 0.1rem solid var(--col-dark);
+  border-radius: 0.4rem;
+}
+
+.panel .schema-field > input,
+.panel .schema-field .row > input {
+  width: 100%;
+  flex: 1;
+}
+
+.panel .schema-field .row {
+  margin: 0.3rem 0;
+}
+
+.panel form.row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel .community .help {
+  display: block;
+}
+
+.leaflet-control .community-button {
+  font: inherit;
+  color: var(--col-lightest);
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
 .panel .resolve {
   margin: 0.75rem 0;
   padding: 0.25rem 0.75rem;

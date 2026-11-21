@@ -3,16 +3,18 @@
 import L from 'leaflet'
 import { createAccount, linkButton } from './account.ts'
 import { api } from './api.ts'
+import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
-import { addPanes, colorPolygons, loadLayers } from './layers.ts'
+import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
 
-// Everything the layers control can show or hide: each map layer, plus the
-// dynmap image beneath them.
+// Everything that can be shown or hidden: each map layer, plus the dynmap
+// image beneath them. Official layers and the dynmap are always in the layers
+// control; community layers are turned on in their own list.
 interface Toggle {
     id: string
     name: string
@@ -49,6 +51,7 @@ async function main() {
             linkButton('Update the map', () => editor.home()),
             linkButton('Your changes', () => editor.myRequests()),
             (waiting.length > 0 || user.role === 'admin') && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
+            user.role === 'admin' && linkButton('Moderate', () => editor.moderate()),
         ].filter((n): n is HTMLButtonElement => !!n)
     })
     const allLayers = await loadLayers()
@@ -56,13 +59,24 @@ async function main() {
     const { map, dynmap } = createMap()
     addPanes(map)
 
-    const toggles: Toggle[] = [
-        ...layers.map(l => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official })),
-        { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true },
-    ]
+    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official })
+    const toggles: Toggle[] = [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true }]
     showInitial(map, toggles)
-    const overlays = Object.fromEntries(toggles.map(t => [t.name, t.group]))
-    L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
+    const overlays = Object.fromEntries(toggles.filter(t => t.byDefault).map(t => [t.name, t.group]))
+    const control = L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' })
+    const community = createCommunity({
+        map, layers, control,
+        show: (...args) => editor.show(...args),
+        // Someone made a new layer: carry on to its settings.
+        created: l => {
+            toggles.push(toggleOf(l))
+            save(map, toggles)
+            editor.settings(l.layer.id)
+        },
+    })
+    // Controls in the bottom corners stack upwards, so the button sits beneath the layers control.
+    community.button.addTo(map)
+    control.addTo(map)
     map.on('overlayadd overlayremove', () => save(map, toggles))
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
@@ -71,6 +85,11 @@ async function main() {
     const editor = createEditor(map, layers, index)
     resolveEditor!(editor)
     createSidebar(map, layers, index, editor.pick)
+
+    // Links in notification emails open a change request.
+    const request = Number(getParam('request'))
+    setParam('request', null)
+    if (request) editor.openRequest(request).catch(e => editor.show('Change request', (e as Error).message))
 }
 
 main()

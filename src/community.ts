@@ -1,0 +1,88 @@
+// Community layers: every layer that isn't official. They're hidden until a
+// viewer turns them on in this list, which adds them to the layers control
+// (and so to ?layers=). Anyone signed in can make a new one here, and becomes
+// its admin.
+
+import L from 'leaflet'
+import { DIMENSIONS, type Layer } from '../shared/layer.ts'
+import { api } from './api.ts'
+import { attempt, button, el, errorBox } from './dom.ts'
+import type { MapLayer } from './layers.ts'
+
+type Show = (title: string, ...children: (Node | string | null | false)[]) => void
+
+interface Options {
+    map: L.Map
+    control: L.Control.Layers
+    layers: MapLayer[]
+    show: Show
+    // Called with a layer made here, once it's on the map.
+    created: (mapLayer: MapLayer) => void
+}
+
+export function createCommunity({ map, control, layers, show, created }: Options) {
+    const community = () => layers.filter(l => !l.layer.official)
+
+    // Community layers are in the layers control while they're shown.
+    function setShown(l: MapLayer, on: boolean) {
+        if (on) {
+            control.addOverlay(l.group, l.layer.name)
+            l.group.addTo(map)
+        } else {
+            l.group.remove()
+            control.removeLayer(l.group)
+        }
+    }
+    for (const l of community()) if (map.hasLayer(l.group)) control.addOverlay(l.group, l.layer.name)
+
+    function open() {
+        const name = el('input', { required: true, placeholder: 'Name' })
+        const description = el('input', { placeholder: 'What it shows (optional)' })
+        const dimension = el('select', {}, DIMENSIONS.map(d => el('option', { value: d }, d === 'overworld' ? 'Overworld' : 'Nether')))
+        const error = errorBox()
+        const form = el('form', {}, [
+            el('label', { class: 'field' }, [el('span', {}, 'Name'), name]),
+            el('label', { class: 'field' }, [el('span', {}, 'Description'), description]),
+            el('label', {}, ['Coordinates from the ', dimension]),
+            error,
+            el('div', { class: 'row' }, el('button', { class: 'primary' }, 'Make the layer')),
+        ])
+        form.addEventListener('submit', e => {
+            e.preventDefault()
+            attempt(error, async () => {
+                const layer = await api<Layer>('layers', { name: name.value, description: description.value, dimension: dimension.value })
+                const l: MapLayer = { layer, objects: [], group: L.layerGroup() }
+                layers.push(l)
+                setShown(l, true)
+                created(l)
+            })
+        })
+
+        const list = community()
+        show('Community layers',
+            el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to see them.'),
+            list.length === 0 && el('p', { class: 'muted' }, 'There are none yet.'),
+            ...list.map(l => {
+                const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
+                box.addEventListener('change', () => setShown(l, box.checked))
+                return el('label', { class: 'check community' }, [box, ' ', el('span', {}, [
+                    l.layer.name,
+                    l.layer.description && el('small', { class: 'help' }, l.layer.description),
+                ])])
+            }),
+            el('h3', {}, 'Make your own'),
+            el('p', { class: 'muted' }, "Once it's made, anyone can suggest things to add to it, and you decide what goes on."),
+            form,
+        )
+    }
+
+    // A button beneath the layers control that opens the list.
+    const Button = L.Control.extend({
+        onAdd: () => {
+            const b = button('Community layers', open, 'community-button')
+            L.DomEvent.disableClickPropagation(b)
+            return el('div', { class: 'leaflet-control-layers leaflet-control' }, b)
+        },
+    })
+    return { open, button: new Button({ position: 'bottomleft' }) }
+}
