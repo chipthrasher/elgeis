@@ -10,14 +10,6 @@ If you can accomplish something with less code, please do so. If you can accompl
 
 Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. Items are numbered so they can be approved by number; when one is done, delete it and leave the other numbers alone.
 
-### Milestone 3: Change requests
-
-10. **Change request API.** Create/edit/submit/withdraw drafts made of `add`/`update`/`delete` ops with `baseVersion`, validated with the shared module. Limit of 10 open requests per account. Mark requests stale when their base objects change.
-11. **Approval pipeline.** Approvals run one at a time: apply ops to the layers repo, commit (requester as author, admin and CR ID in the message), rebuild static JSON, mark approved in Postgres, push to the remote. On startup, reconcile recent commits against Postgres.
-12. **Editor UI: properties.** Submit edits to existing objects (and hide/unhide) through a form generated from the schema, then view your own requests and their status.
-13. **Editor UI: geometry.** Draw and edit points, lines, and polygons (with holes) on the map. Snap to neighboring polygons' vertices. For Nether portals, suggest a connector to the nearest highway.
-14. **Review UI.** Layer admins see the old shape in red, the new one in green, and a list of changed properties. Approve/reject with comments. Show warnings about overlaps and gaps with neighbors (disputed polygons exempt).
-
 ### Milestone 4: Community layers and moderation
 
 15. **Layer admin tools.** A schema editor and adding/removing layer admins.

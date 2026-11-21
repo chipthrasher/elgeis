@@ -147,12 +147,21 @@ a {
 
 /* Account */
 
-/* A box over the map, top right */
-.account {
+/* The account box and the editor panel, stacked over the map, top right */
+.corner {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-height: calc(100vh - 2rem);
+  max-width: calc(100vw - 2rem);
+}
+
+.account {
   max-width: 22rem;
   padding: 0.6rem 1rem;
   background: var(--col-darker);
@@ -201,6 +210,10 @@ a {
   padding: 0.4rem 0.75rem;
 }
 
+.account .stack {
+  flex-direction: column;
+}
+
 .account input {
   flex: 1;
   min-width: 0;
@@ -216,6 +229,370 @@ a {
   color: var(--col-pastel-red);
 }
 
+.account .links {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 0.25rem;
+}
+
+/* Editor panel, below the account box */
+
+.panel {
+  width: 24rem;
+  max-width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem 1rem;
+  background: var(--col-darker);
+  color: var(--col-lighter);
+  border-radius: 0.3rem;
+  box-shadow: var(--box-shadow);
+  font-size: 0.9rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.panel h2 {
+  font-size: 1.1rem;
+  color: var(--col-lightest);
+  margin: 0 0 0.5rem;
+}
+
+.panel p {
+  margin: 0.5rem 0;
+}
+
+.panel .muted {
+  color: var(--col-light);
+}
+
+.panel input:not([type=checkbox]):not([type=color]),
+.panel select,
+.panel textarea,
+.panel button:not(.link) {
+  font: inherit;
+  color: var(--col-lightest);
+  background: var(--col-dark);
+  border: 0.1rem solid var(--col-dark);
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  box-sizing: border-box;
+}
+
+.panel input[type=search],
+.panel textarea,
+.panel .field input {
+  width: 100%;
+}
+
+.panel input[type=color] {
+  width: 2.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.panel textarea {
+  min-height: 4rem;
+  margin-top: 0.5rem;
+}
+
+.panel button {
+  cursor: pointer;
+}
+
+.panel button:not(.link) {
+  border-color: var(--col-light);
+}
+
+.panel button.primary {
+  background: var(--col-pastel-green);
+  border-color: var(--col-pastel-green);
+  color: var(--col-darkest);
+  font-weight: 500;
+}
+
+.panel .link {
+  font: inherit;
+  color: var(--col-lightest);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.panel .close {
+  font-size: 1.4rem;
+  text-decoration: none;
+}
+
+.panel .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+
+.panel .field {
+  display: block;
+  margin: 0.5rem 0;
+}
+
+.panel .field > span {
+  display: block;
+  color: var(--col-light);
+  font-size: 0.8rem;
+}
+
+.panel .help {
+  display: block;
+  margin: -0.1rem 0 0.3rem;
+  color: var(--col-light);
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.panel .check .help {
+  margin-left: 1.5rem;
+}
+
+.panel .field .row {
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+.panel .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.panel .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+  background: var(--col-dark);
+  border: 1px solid var(--col-light);
+  border-radius: 0.4rem;
+}
+
+.panel .chip .link {
+  padding: 0 0.3rem;
+  border-radius: 0.25rem;
+  text-decoration: none;
+  color: var(--col-light);
+}
+
+.panel .chip .link:hover {
+  color: var(--col-lightest);
+  background: var(--col-darker);
+}
+
+.panel .check {
+  display: block;
+  margin: 0.5rem 0;
+}
+
+.panel .results {
+  display: flex;
+  flex-direction: column;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.panel button.result,
+.panel button.request {
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+}
+
+.panel button.result:hover,
+.panel button.request:hover {
+  background: var(--col-dark);
+}
+
+.panel button.request {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel .status {
+  color: var(--col-light);
+  white-space: nowrap;
+}
+
+.panel .status.approved { color: var(--col-pastel-green); }
+.panel .status.rejected,
+.panel .status.stale { color: var(--col-pastel-red); }
+.panel .status.submitted { color: var(--col-pastel-blue); }
+
+.panel .shape {
+  margin: 0.75rem 0;
+}
+
+.panel .change {
+  margin: 0.75rem 0;
+}
+
+.panel .change-title {
+  font-weight: 500;
+  color: var(--col-lightest);
+}
+
+.panel .op {
+  margin: 0.25rem 0;
+  flex-wrap: nowrap;
+}
+
+.panel .op .change-title {
+  flex: 1;
+}
+
+.change-title.add::before { content: "+ "; color: var(--col-pastel-green); }
+.change-title.update::before { content: "~ "; color: var(--col-pastel-blue); }
+.change-title.delete::before { content: "− "; color: var(--col-pastel-red); }
+
+.panel table {
+  border-collapse: collapse;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.panel th,
+.panel td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.15rem 0.5rem 0.15rem 0;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.panel th {
+  color: var(--col-light);
+  width: 30%;
+}
+
+.panel tr.heading th {
+  font-size: 0.8rem;
+}
+
+.panel .toggle {
+  display: inline-flex;
+  margin: 0.5rem 0;
+  border: 1px solid var(--col-light);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.panel .toggle button {
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--col-lighter);
+}
+
+.panel .toggle button + button {
+  border-left: 1px solid var(--col-light);
+}
+
+.panel .toggle button.on {
+  background: var(--col-dark);
+  color: var(--col-lightest);
+}
+
+.panel td.old {
+  color: var(--col-pastel-red);
+  text-decoration: line-through;
+}
+
+.panel td.new {
+  color: var(--col-pastel-green);
+}
+
+.panel .warning,
+.panel .error {
+  color: var(--col-pastel-red);
+  margin: 0.4rem 0;
+  white-space: pre-line;
+}
+
+.panel .resolve {
+  margin: 0.75rem 0;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--col-pastel-red);
+  border-radius: 0.4rem;
+}
+
+.panel .conflict {
+  margin: 0.4rem 0 0.6rem;
+}
+
+.panel .conflict .check {
+  margin: 0.1rem 0;
+}
+
+.panel .conflict-field {
+  color: var(--col-light);
+  font-size: 0.8rem;
+}
+
+.panel .comment {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: var(--col-dark);
+  border-radius: 0.4rem;
+  white-space: pre-line;
+}
+
+/* Your draft's changes, drawn over the map while you edit */
+
+.diff-new,
+.diff-warning,
+.editing,
+.connector {
+  stroke-width: 3px;
+}
+
+.diff-new {
+  stroke: var(--col-pastel-green);
+  fill: var(--col-pastel-green);
+  fill-opacity: 0.25;
+}
+
+.diff-warning {
+  stroke: #ffd54a;
+  fill: none;
+}
+
+path.editing {
+  stroke: var(--col-pastel-blue);
+  fill: var(--col-pastel-blue);
+  fill-opacity: 0.2;
+}
+
+.point.editing {
+  background: var(--col-pastel-blue);
+}
+
+.connector {
+  stroke: var(--col-pastel-blue);
+  stroke-dasharray: 4 4;
+}
+
 /* Directory */
 
 #directory h2 {
@@ -224,6 +601,13 @@ a {
   letter-spacing: 0.08rem;
   color: var(--col-light);
   margin: 1.5rem 1.8rem 0.5rem;
+}
+
+#directory .layer-description {
+  margin: -0.25rem 1.8rem 0.5rem;
+  color: var(--col-light);
+  font-size: 0.85rem;
+  line-height: 1.3;
 }
 
 .item {

@@ -1,22 +1,17 @@
 // Looks up objects across every layer and follows the references between them,
 // e.g. from a portal to its nation, or from a nation back to its polygons.
 
-import { entityName, valuesOf, type Field, type Geometry, type LayerObject, type Position } from '../shared/layer.ts'
+import { valuesOf, type Field, type Geometry, type LayerObject, type Position } from '../shared/layer.ts'
 import type { MapObject } from './layers.ts'
 
 export class ObjectIndex {
     readonly all: MapObject[]
     private byId = new Map<string, MapObject>()
-    private byEntityName = new Map<string, MapObject>()
     private referencedBy = new Map<MapObject, MapObject[]>()
 
     constructor(all: MapObject[]) {
         this.all = all
-        for (const o of all) {
-            this.byId.set(o.object.id, o)
-            const name = entityName(o.layer, o.object)
-            if (name) this.byEntityName.set(name, o)
-        }
+        for (const o of all) this.byId.set(o.object.id, o)
         for (const o of all) {
             for (const target of this.references(o)) {
                 this.referencedBy.set(target, [...this.referencedBy.get(target) ?? [], o])
@@ -24,8 +19,11 @@ export class ObjectIndex {
         }
     }
 
-    // The objects this one points to: by ID through its reference fields, and
-    // by name through its entities fields.
+    get(id: string): MapObject | undefined {
+        return this.byId.get(id)
+    }
+
+    // The objects this one points to, through its reference and entities fields.
     references(o: MapObject): MapObject[] {
         return o.layer.fields.flatMap(f => this.resolve(o, f))
     }
@@ -34,8 +32,8 @@ export class ObjectIndex {
     resolve(o: MapObject, field: Field): MapObject[] {
         const value = o.object.properties[field.key]
         const values = typeof value === 'string' ? [value] : Array.isArray(value) ? value : []
-        const lookup = field.type === 'reference' ? this.byId : field.type === 'entities' ? this.byEntityName : null
-        return lookup ? values.flatMap(v => lookup.get(v) ?? []) : []
+        if (field.type !== 'reference' && field.type !== 'entities') return []
+        return values.flatMap(v => this.byId.get(v) ?? [])
     }
 
     // The objects that point to this one.

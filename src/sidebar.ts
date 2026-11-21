@@ -27,7 +27,8 @@ function swatch(colors: string[]): string {
     return `linear-gradient(to right, ${bands.join(', ')})`
 }
 
-export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex) {
+// `pick` gets first go at clicks on the map's objects, for the editor.
+export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex, pick: (o: MapObject) => boolean) {
     const searchInput = document.querySelector<HTMLInputElement>('.search')!
     const directory = document.querySelector('#directory')!
     const items = new Map<MapObject, HTMLDetailsElement>()
@@ -126,7 +127,10 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             .sort((a, b) => index.title(a).localeCompare(index.title(b)))
         if (entries.length === 0) continue
 
-        const section = el('section', {}, el('h2', {}, mapLayer.layer.name))
+        const section = el('section', {}, [
+            el('h2', {}, mapLayer.layer.name),
+            mapLayer.layer.description && el('p', { class: 'layer-description' }, mapLayer.layer.description),
+        ])
         for (const o of entries) {
             const item = buildItem(o)
             items.set(o, item)
@@ -143,7 +147,7 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             }
             o.drawn!.on('mouseover', () => highlight(o, true))
             o.drawn!.on('mouseout', () => highlight(o, false))
-            o.drawn!.on('click', () => select(o))
+            o.drawn!.on('click', () => { if (!pick(o)) select(o) })
         }
         sections.set(mapLayer, section)
         directory.append(section)

@@ -27,9 +27,9 @@ const polygon = {
     type: 'Feature',
     id: 'pol_a',
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 0]]] },
-    properties: { entities: ['Adfelis'] },
+    properties: { entities: ['ent_a'] },
 }
-const hidden = { ...polygon, id: 'pol_b', properties: { entities: ['Adfelis'], hidden: true } }
+const hidden = { ...polygon, id: 'pol_b', properties: { entities: ['ent_a'], hidden: true } }
 
 test('builds visible objects and an index', () => {
     const src = fixture({
@@ -51,7 +51,7 @@ test('reports every problem at once', () => {
         'political/layer.json': manifest,
         'political/ent_a.json': nation,
         'political/ent_b.json': { ...nation, id: 'ent_b' }, // duplicate entity name
-        'political/pol_a.json': { ...polygon, properties: { entities: ['Emeraldia'] } }, // no such entity
+        'political/pol_a.json': { ...polygon, properties: { entities: ['ent_c'] } }, // no such entity
         'political/pol_c.json': { ...polygon, id: 'pol_d' }, // wrong file name
         'nether/layer.json': { ...manifest, id: 'wrong' },
     })
@@ -59,7 +59,7 @@ test('reports every problem at once', () => {
         assert.match(e.message, /doesn't match its folder "nether"/)
         assert.match(e.message, /pol_c\.json: File name doesn't match ID "pol_d"/)
         assert.match(e.message, /ent_b\.json: Duplicate entity name "Adfelis"/)
-        assert.match(e.message, /Lists missing entity "Emeraldia"/)
+        assert.match(e.message, /Lists missing entity "ent_c"/)
         return true
     })
     assert.ok(!fs.existsSync(path.join(src, 'out')))

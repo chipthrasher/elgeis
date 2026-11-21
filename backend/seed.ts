@@ -1,5 +1,6 @@
 // Creates a test site admin and a test regular user, for development. Sign in
-// as either by entering their email and opening the link in Mailpit.
+// as either with "Email me a link" and opening the link in Mailpit. They have
+// no password until one is set with "Forgot password?".
 //
 // Usage: node backend/seed.ts   (needs DATABASE_URL)
 

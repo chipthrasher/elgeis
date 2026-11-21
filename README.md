@@ -19,7 +19,7 @@ To sign in, create a test site admin (`admin@example.com`) and a test regular us
 docker compose exec backend node backend/seed.ts
 ```
 
-Then enter one of their emails under "Sign in" and open the link from Mailpit. Any other email works too, as a new account.
+They have no passwords: under "Sign in", choose "Email me a link" (or "Forgot password?" to set one) and open the email in Mailpit. To make a new account, sign up and open the confirmation email in Mailpit.
 
 Map data lives in its own repo, [chipthrasher/elgeisdata](https://github.com/chipthrasher/elgeisdata): a folder per layer, each with a `layer.json` manifest plus one GeoJSON file per object. The backend clones it on first start and builds it into the static JSON the map loads.
 

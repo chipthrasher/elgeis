@@ -16,12 +16,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
-import { entityName, Layer, objectSchema, valuesOf, type LayerObject } from '../shared/layer.ts'
-
-export interface LayerData {
-    layer: Layer
-    objects: LayerObject[]
-}
+import { checkLayers, Layer, objectSchema, type LayerData, type LayerObject } from '../shared/layer.ts'
 
 const MANIFEST = 'layer.json'
 
@@ -65,31 +60,7 @@ export function readLayers(dir: string): LayerData[] {
         layers.push({ layer, objects })
     }
 
-    // IDs and entity names are unique across all layers, and references (by ID
-    // or entity name) can point into any layer.
-    const ids = new Set<string>()
-    const names = new Set<string>()
-    for (const { layer, objects } of layers) {
-        for (const object of objects) {
-            const file = path.join(dir, layer.id, object.id + '.json')
-            if (ids.has(object.id)) fail(file, 'Duplicate ID')
-            ids.add(object.id)
-            const name = entityName(layer, object)
-            if (name && names.has(name)) fail(file, `Duplicate entity name "${name}"`)
-            if (name) names.add(name)
-        }
-    }
-    for (const { layer, objects } of layers) {
-        for (const object of objects) {
-            const file = path.join(dir, layer.id, object.id + '.json')
-            for (const ref of valuesOf(layer, object, 'reference')) {
-                if (!ids.has(ref)) fail(file, `References missing object "${ref}"`)
-            }
-            for (const name of valuesOf(layer, object, 'entities')) {
-                if (!names.has(name)) fail(file, `Lists missing entity "${name}"`)
-            }
-        }
-    }
+    for (const { layerId, objectId, message } of checkLayers(layers)) fail(path.join(dir, layerId, objectId + '.json'), message)
 
     if (errors.length) throw new Error(`Invalid layer data:\n${errors.join('\n')}`)
     return layers
