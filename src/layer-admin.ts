@@ -55,6 +55,11 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
 
         const name = el('input', { value: layer.name })
         const hoverLines = el('input', { type: 'checkbox', checked: !!layer.hoverLines })
+        // Typed, or picked; empty for none.
+        const defaultColor = el('input', { value: layer.defaultColor ?? '', placeholder: 'None (grey)' })
+        const colorPicker = el('input', { type: 'color', value: layer.defaultColor?.length === 7 ? layer.defaultColor : '#888888' })
+        colorPicker.addEventListener('input', () => { defaultColor.value = colorPicker.value })
+        defaultColor.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(defaultColor.value.trim())) colorPicker.value = defaultColor.value.trim() })
         const description = el('input', { value: layer.description ?? '', placeholder: 'What the layer shows (optional)' })
         const rows = el('div', { class: 'fields' })
         const choices = el('div')
@@ -139,6 +144,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                 titleField: title ? keys.get(title) : '',
                 labelField: label && keys.get(label),
                 hoverLines: hoverLines.checked,
+                defaultColor: defaultColor.value.trim(),
                 fields: fields.map(f => ({ ...f, key: keys.get(f) })),
             }, 'PUT')
             settings(layerId, 'Saved. Reload the page to see the changes on the map.')
@@ -159,6 +165,11 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                 rows.querySelector<HTMLInputElement>('.schema-field:last-child input')?.focus()
             })]),
             choices,
+            el('label', { class: 'field' }, [
+                el('span', {}, 'Default color'),
+                el('small', { class: 'help' }, "For areas without a color of their own, or from the political entities they list. Leave it empty for grey."),
+                el('div', { class: 'row' }, [defaultColor, colorPicker]),
+            ]),
             el('label', { class: 'check' }, [hoverLines, ' Lines show their hover card',
                 el('small', { class: 'help' }, "Hovering a line shows its name, and clicking it finds it, like a point. Leave it off if the lines have no names, so they don't get in the way of what's beneath them.")]),
             error,

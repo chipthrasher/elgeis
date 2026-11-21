@@ -58,14 +58,18 @@ export class ObjectIndex {
         return this.references(o).map(ownTitle).filter(Boolean).join(' / ')
     }
 
-    // An object's color fields, or else the colors of what it references. So a
-    // community layer's area is its own Color, and a political area its
-    // nations' colors unless it has a Color of its own, which overrides them.
-    // A polygon claimed by several nations gets several colors.
+    // An object's color fields, or else the colors of what it references, or
+    // else its layer's default color. So a community layer's area is its own
+    // Color, and a political area its nations' colors unless it has a Color of
+    // its own, which overrides them. A polygon claimed by several nations gets
+    // several colors.
     colors(o: MapObject): string[] {
         const colorsOf = (m: MapObject) => valuesOf(m.layer, m.object, 'color')
         const own = colorsOf(o)
-        return own.length ? own : this.references(o).flatMap(colorsOf)
+        if (own.length) return own
+        const referenced = this.references(o).flatMap(colorsOf)
+        if (referenced.length) return referenced
+        return o.layer.defaultColor ? [o.layer.defaultColor] : []
     }
 }
 

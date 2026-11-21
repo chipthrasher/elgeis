@@ -26,6 +26,7 @@ const LayerEdit = z.object({
     titleField: z.string(),
     labelField: z.string().optional(),
     hoverLines: z.boolean().optional(),
+    defaultColor: z.string().optional(),
     fields: z.array(Field).max(50),
 }).strict()
 
@@ -136,7 +137,7 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
         const edit = await parseBody(c, LayerEdit)
         await serially(async () => {
             const { layer, objects } = find(c.req.param('id'))
-            const result = Layer.safeParse({ ...layer, ...edit, description: edit.description || undefined, labelField: edit.labelField || undefined, hoverLines: edit.hoverLines || undefined })
+            const result = Layer.safeParse({ ...layer, ...edit, description: edit.description || undefined, labelField: edit.labelField || undefined, hoverLines: edit.hoverLines || undefined, defaultColor: edit.defaultColor || undefined })
             if (!result.success) throw fail(400, z.prettifyError(result.error))
             const keys = new Set(['hidden', ...result.data.fields.map(f => f.key)])
             const trimmed = objects.flatMap(o => Object.keys(o.properties).some(k => !keys.has(k))

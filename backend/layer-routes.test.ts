@@ -75,6 +75,12 @@ test("a layer's admins edit its schema and choose its other admins", { skip }, a
     assert.equal((await json(await edit(steve, { name: layer.name, titleField: 'name', fields: layer.fields, hoverLines: true }))).hoverLines, true)
     assert.equal((await json(await edit(steve, { name: layer.name, titleField: 'name', fields: layer.fields }))).hoverLines, undefined)
 
+    // So is a default color for areas, which has to be a color.
+    const base = { name: layer.name, titleField: 'name', fields: layer.fields }
+    assert.equal((await edit(steve, { ...base, defaultColor: 'green' })).status, 400)
+    assert.equal((await json(await edit(steve, { ...base, defaultColor: '#00ff00' }))).defaultColor, '#00ff00')
+    assert.equal((await json(await edit(steve, { ...base, defaultColor: '' }))).defaultColor, undefined)
+
     // Saving without changing anything is fine, and makes no commit.
     const untouched = git(dir, 'rev-parse', 'HEAD')
     assert.equal((await edit(steve, { name: layer.name, titleField: 'name', fields: layer.fields })).status, 200)
