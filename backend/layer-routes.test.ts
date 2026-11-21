@@ -237,13 +237,22 @@ test('new layers wait for approval, unless their creator is trusted, and the sit
     assert.deepEqual(sent, [{ to: 'Elgeis Map <map@example.com>', headers: undefined }])
 
     // Each link only does what it says, to its own layer.
-    const visit = (url: URL) => browser()(url.pathname + url.search)
-    assert.equal((await visit(new URL(`/api/layers/${farms.id}/reject${approveLink.search}`, approveLink))).status, 403)
-    const page = await visit(approveLink)
+    // Opening one only asks; the button does it, so mail scanners can't.
+    const visit = (url: URL, method = 'GET') => browser()(url.pathname + url.search, undefined, method)
+    assert.equal((await visit(new URL(`/api/layers/${farms.id}/reject${approveLink.search}`, approveLink), 'POST')).status, 403)
+    assert.match(await (await visit(approveLink)).text(), /Approve Farms\?/)
+    assert.deepEqual(index(build), ['political'])
+    const page = await visit(approveLink, 'POST')
     assert.equal(page.status, 200)
     assert.match(await page.text(), /Approved Farms/)
     assert.deepEqual(index(build), [farms.id, 'political'])
     assert.match(await (await visit(rejectLink)).text(), /already approved/)
+    assert.match(await (await visit(rejectLink, 'POST')).text(), /already approved/)
+
+    // And its creator hears about it.
+    const told = (await queued())!
+    assert.equal(told.subject, 'Farms is approved')
+    assert.match(told.text, /Your layer "Farms" is approved/)
 
     // Now steve runs a public layer, so his next one is public at once.
     assert.equal((await create(steve, 'Mines')).pending, false)
@@ -253,7 +262,7 @@ test('new layers wait for approval, unless their creator is trusted, and the sit
     // Rejecting hides it, which a site admin can undo.
     const spam = await create(alex, 'Spam')
     const reject = new URL([...(await queued())!.text.matchAll(/http\S+/g)][1][0])
-    assert.match(await (await visit(reject)).text(), /Rejected Spam/)
+    assert.match(await (await visit(reject, 'POST')).text(), /Rejected Spam/)
     assert.equal((await (await admin('/api/layers')).json()).find((l: { id: string }) => l.id === spam.id).hidden, true)
     assert.equal(index(build).includes(spam.id), false)
     // And being an admin of a hidden layer doesn't make anyone trusted.
