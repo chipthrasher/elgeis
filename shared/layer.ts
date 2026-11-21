@@ -52,7 +52,8 @@ export const Field = z.object({
     key: fieldKey,
     label: z.string().min(1),
     type: z.enum(FIELD_TYPES),
-    // Shown as the icon's tooltip, e.g. what a flag means.
+    // What the field means: shown under it in the editor, and as its icon's
+    // tooltip, e.g. what a flag means.
     description: z.string().min(1).optional(),
     icon: z.enum(ICONS).optional(),
     // Points with this flag set are drawn with a ring, e.g. national exits.

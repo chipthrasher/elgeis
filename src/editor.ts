@@ -247,7 +247,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         switch (field.type) {
             case 'flag': {
                 const box = el('input', { id, type: 'checkbox', checked: value === true })
-                return { node: el('label', { class: 'check' }, [box, ' ', field.label]), read: () => box.checked || undefined }
+                return { node: el('label', { class: 'check' }, [box, ' ', field.label, help(field)]), read: () => box.checked || undefined }
             }
             case 'color': {
                 const picker = el('input', { type: 'color', value: typeof value === 'string' && value.length === 7 ? value : '#888888' })
@@ -267,7 +267,9 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     }
 
     const labelled = (field: Field, ...inputs: Node[]) =>
-        el('label', { class: 'field', title: field.description }, [el('span', {}, field.label), ...inputs])
+        el('label', { class: 'field' }, [el('span', {}, field.label), help(field), ...inputs])
+    // What the field is for, from the layer's schema.
+    const help = (field: Field) => field.description && el('small', { class: 'help' }, field.description)
 
     // Edit an object (by ID), or make a new one of a kind (null: no shape).
     async function form(layerId: string, id: string | null, kind?: ShapeKind | null) {

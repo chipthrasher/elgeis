@@ -348,6 +348,18 @@ a {
   font-size: 0.8rem;
 }
 
+.panel .help {
+  display: block;
+  margin: 0.1rem 0 0.3rem;
+  color: var(--col-light);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.panel .check .help {
+  margin-left: 1.5rem;
+}
+
 .panel .field .row {
   margin: 0;
   flex-wrap: nowrap;
