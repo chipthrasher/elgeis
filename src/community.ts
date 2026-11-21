@@ -52,7 +52,7 @@ export function createCommunity({ map, control, layers, show, created }: Options
         // Who runs each layer, from the backend. Left out if it can't be reached.
         const infos = await api<LayerInfo[]>('layers').catch(() => [])
         const adminsOf = (layerId: string) => infos.find(i => i.id === layerId)?.admins ?? []
-        show('Community layers',
+        show('Your layers',
             el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to see them.'),
             list.length === 0 && el('p', { class: 'muted' }, 'There are none yet.'),
             ...list.map(l => {

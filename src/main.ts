@@ -21,7 +21,7 @@ async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
     let openCommunity = () => {}
-    createAccount(document.querySelector('#account')!, () => [linkButton('Community layers', () => openCommunity())], async user => {
+    createAccount(document.querySelector('#account')!, () => [linkButton('Your layers', () => openCommunity())], async user => {
         const editor = await ready
         // Reviewers get a link to what's waiting for them.
         const waiting = await api<unknown[]>('requests?review')
