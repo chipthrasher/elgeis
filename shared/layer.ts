@@ -74,6 +74,9 @@ export const Layer = z.object({
     titleField: fieldKey,
     // A shorter name drawn on the map instead of the title, when set.
     labelField: fieldKey.optional(),
+    // Whether hovering or clicking a line shows its hover card and finds it,
+    // like a point. Off, lines let the mouse through to what's beneath.
+    hoverLines: z.boolean().optional(),
     fields: z.array(Field),
 }).strict().superRefine((layer, ctx) => {
     const keys = layer.fields.map(f => f.key)

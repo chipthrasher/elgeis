@@ -83,11 +83,16 @@ function rendererFor(pane: string) {
     return renderers.get(pane)!
 }
 
+// How wide a line is to the mouse, in pixels, when its layer's lines take
+// hover (see Layer.hoverLines), so it's easy to land on.
+const LINE_HIT_WIDTH = 14
+
 export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     const scale = DIMENSION_SCALE[layer.dimension]
     const ring = layer.fields.some(f => f.ring && object.properties[f.key] === true)
+    const lines = paneFor(layer.id, 'lines')
 
-    return L.geoJSON(object as GeoJsonObject, {
+    const drawn = L.geoJSON(object as GeoJsonObject, {
         coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
         pointToLayer: (_, latlng) => L.marker(latlng, {
             icon: L.divIcon({ className: ring ? 'point ring' : 'point', iconSize: [10, 10] }),
@@ -96,10 +101,10 @@ export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
             snapIgnore: false,
         }),
         style: feature => {
-            const polygons = paneFor(layer.id, 'polygons'), lines = paneFor(layer.id, 'lines')
+            const polygons = paneFor(layer.id, 'polygons')
             return /Polygon/.test(feature?.geometry.type ?? '')
                 ? { className: 'polygon', pane: polygons, renderer: rendererFor(polygons), color: NO_COLOR, fillColor: NO_COLOR, snapIgnore: false }
-                : { className: 'line', pane: lines, renderer: rendererFor(lines), interactive: false, snapIgnore: false }
+                : { className: 'line', pane: lines, renderer: rendererFor(lines), interactive: !!layer.hoverLines, snapIgnore: false }
         },
         // Tag each element with its object's ID, e.g. `[data-id="pol_8f3k2a9x"]`.
         // Leaflet makes new elements whenever a layer is re-added, so tag on every add.
@@ -107,6 +112,20 @@ export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
             (drawn as L.Path | L.Marker).getElement?.()?.setAttribute('data-id', object.id)
         }),
     })
+
+    // Lines are thin, so they get an invisible wider copy to catch the mouse.
+    // It's in the same group, so the line's hover card and clicks come with it.
+    if (layer.hoverLines) {
+        // Including a line in a collection, like a portal's connector.
+        const linesIn = (l: L.Layer): L.Polyline[] => l instanceof L.LayerGroup ? l.getLayers().flatMap(linesIn)
+            : l instanceof L.Polyline && !(l instanceof L.Polygon) ? [l] : []
+        for (const line of linesIn(drawn)) {
+            drawn.addLayer(L.polyline(line.getLatLngs() as L.LatLng[], {
+                className: 'line-hit', pane: lines, renderer: rendererFor(lines), weight: LINE_HIT_WIDTH, opacity: 0,
+            }))
+        }
+    }
+    return drawn
 }
 
 // Fill polygons with their colors (their own, or their nation's). A polygon

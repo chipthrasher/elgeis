@@ -54,6 +54,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
         let label = fields.find(f => f.key === layer.labelField)
 
         const name = el('input', { value: layer.name })
+        const hoverLines = el('input', { type: 'checkbox', checked: !!layer.hoverLines })
         const description = el('input', { value: layer.description ?? '', placeholder: 'What the layer shows (optional)' })
         const rows = el('div', { class: 'fields' })
         const choices = el('div')
@@ -137,6 +138,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                 description: description.value,
                 titleField: title ? keys.get(title) : '',
                 labelField: label && keys.get(label),
+                hoverLines: hoverLines.checked,
                 fields: fields.map(f => ({ ...f, key: keys.get(f) })),
             }, 'PUT')
             settings(layerId, 'Saved. Reload the page to see the changes on the map.')
@@ -157,6 +159,8 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                 rows.querySelector<HTMLInputElement>('.schema-field:last-child input')?.focus()
             })]),
             choices,
+            el('label', { class: 'check' }, [hoverLines, ' Lines show their hover card',
+                el('small', { class: 'help' }, "Hovering a line shows its name, and clicking it finds it, like a point. Leave it off if the lines have no names, so they don't get in the way of what's beneath them.")]),
             error,
             el('div', { class: 'row' }, [button('Save', save, 'primary')]),
             await adminsSection(layerId),

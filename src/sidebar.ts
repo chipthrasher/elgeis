@@ -143,7 +143,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
 
             // Polygons have their names drawn inside them instead (see labels.ts).
             if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
-                o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0] })
+                // A line's card follows the mouse along it.
+                o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0], sticky: /LineString/.test(o.object.geometry?.type ?? '') })
             }
             o.drawn!.on('mouseover', () => highlight(o, true))
             o.drawn!.on('mouseout', () => highlight(o, false))
