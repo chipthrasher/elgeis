@@ -43,7 +43,7 @@ async function main() {
     // they're turned on under its "See more".
     const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
     const community = createCommunity({
-        map, layers,
+        layers,
         control: () => control,
         show: (...args) => editor.show(...args),
         settings: layerId => editor.settings(layerId),

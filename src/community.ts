@@ -14,7 +14,6 @@ import type { MapLayer } from './layers.ts'
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
 
 interface Options {
-    map: L.Map
     // The layers control, once it's made.
     control: () => LayerControl
     layers: MapLayer[]
@@ -25,7 +24,7 @@ interface Options {
     settings: (layerId: string) => void
 }
 
-export function createCommunity({ map, control, layers, show, created, settings }: Options) {
+export function createCommunity({ control, layers, show, created, settings }: Options) {
     // The form for making a layer.
     function openNew() {
         const name = el('input', { required: true, placeholder: 'Name' })
@@ -56,7 +55,7 @@ export function createCommunity({ map, control, layers, show, created, settings 
     }
 
     // "See more" in the layers control: a window listing every community
-    // layer, to search and turn on or off, with its admins and description,
+    // layer, to search and add to or remove from the layers control, with its admins and description,
     // and a gear to open the settings of those you're an admin of.
     async function browse() {
         const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Community layers' })
@@ -68,7 +67,8 @@ export function createCommunity({ map, control, layers, show, created, settings 
             .sort((a, b) => a.layer.name.localeCompare(b.layer.name))
             .map(l => {
                 const admins = infoOf(l.layer.id)?.admins ?? []
-                const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
+                // Ticked while it's in the layers control, even if it's unticked there.
+                const box = el('input', { type: 'checkbox', checked: control().isListed(l.layer.id) })
                 box.addEventListener('change', () => control().setShown(l.layer.id, box.checked))
                 const gear = infoOf(l.layer.id)?.canAdmin && el('button', { type: 'button', class: 'link gear', title: 'Layer settings', 'aria-label': `Settings for ${l.layer.name}` }, '⚙')
                 if (gear) gear.addEventListener('click', () => { close(); settings(l.layer.id) })

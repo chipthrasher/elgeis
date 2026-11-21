@@ -146,6 +146,11 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
     new Control({ position: 'bottomleft' }).addTo(map)
 
     return {
+        // Whether a layer is in the list, shown or not.
+        isListed(id: string) {
+            const t = byId(id)
+            return t !== undefined && listed(t)
+        },
         // Know about a layer made since the page loaded.
         add(t: Toggle) {
             toggles.push(t)
