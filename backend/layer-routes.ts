@@ -151,11 +151,17 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
         const trusted = isSiteAdmin(user) || !!await db.selectFrom('layerAdmin').innerJoin('layer', 'layer.id', 'layerAdmin.layerId').select('layerId')
             .where('userId', '=', user.id).where('pending', '=', false).where('hidden', '=', false).executeTakeFirst()
         await serially(async () => {
-            // Kept out of the static JSON from the start.
-            if (!trusted) repo.hidden.add(layer.id)
-            await save(user.id, layer, [], `Create the ${layer.name} layer\n\nCreated by ${user.username}.\n`)
-            await db.insertInto('layer').values({ id: layer.id, createdBy: user.id, pending: !trusted }).onConflict(oc => oc.doNothing()).execute()
+            // Its row first, so a pending layer is never built or given a
+            // public row by reconcile(), even if the backend stops midway.
+            await db.insertInto('layer').values({ id: layer.id, createdBy: user.id, pending: !trusted }).execute()
             await db.insertInto('layerAdmin').values({ layerId: layer.id, userId: user.id }).execute()
+            if (!trusted) repo.hidden.add(layer.id)
+            try {
+                await save(user.id, layer, [], `Create the ${layer.name} layer\n\nCreated by ${user.username}.\n`)
+            } catch (e) {
+                await db.deleteFrom('layer').where('id', '=', layer.id).execute()
+                throw e
+            }
         })
         if (!trusted && mailFrom) {
             const link = (decision: Decision) => `${siteUrl}/api/layers/${layer.id}/${decision}?token=${sign(secret, decisionMessage(layer.id, decision))}`
