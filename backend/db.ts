@@ -23,6 +23,8 @@ export interface Database {
         // "admin" for site admins.
         role: string | null
         banned: boolean | null
+        // Ours: whether they get notification emails (see notify.ts).
+        emailNotifications: Generated<boolean>
         createdAt: Generated<Date>
         updatedAt: Generated<Date>
     }

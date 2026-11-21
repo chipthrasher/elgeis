@@ -5,6 +5,7 @@ import { createAccount, linkButton } from './account.ts'
 import { api } from './api.ts'
 import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
+import { emailSettings } from './notifications.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
@@ -90,6 +91,12 @@ async function main() {
     const request = Number(getParam('request'))
     setParam('request', null)
     if (request) editor.openRequest(request).catch(e => editor.show('Change request', (e as Error).message))
+    // And the setting for them, from the link at their foot, or the mail
+    // client's Unsubscribe. The token stays out of the address bar, so it
+    // isn't shared by accident.
+    const token = getParam('notifications')
+    setParam('notifications', null)
+    if (token) emailSettings(token).then(node => editor.show('Email notifications', node), e => editor.show('Email notifications', (e as Error).message))
 }
 
 main()

@@ -10,7 +10,7 @@ import { layerRoutes } from './layer-routes.ts'
 import { LayersRepo } from './layers.ts'
 import { createMailer } from './mail.ts'
 import { migrateToLatest } from './migrate.ts'
-import { sendQueued } from './notify.ts'
+import { notificationRoutes, sendQueued, settingsLink } from './notify.ts'
 import { rateLimit, RATE_LIMIT } from './rate-limit.ts'
 import { requestRoutes } from './requests.ts'
 
@@ -33,6 +33,7 @@ export function createApp(auth: Auth, db: Db, repo: LayersRepo, siteUrl: string,
     api.use(currentUser(auth))
     api.route('/', requests.app)
     api.route('/', layerRoutes(deps, requests))
+    api.route('/', notificationRoutes(db, auth.options.secret!))
     app.route('/', api)
 
     // Errors are JSON, like Better Auth's, with a message to show.
@@ -63,7 +64,7 @@ if (import.meta.main) {
     setInterval(async () => {
         if (sending) return
         sending = true
-        await sendQueued(db, sendMail).catch(e => console.error('Sending notifications failed:', e)).finally(() => { sending = false })
+        await sendQueued(db, sendMail, id => settingsLink(env.SITE_URL!, env.BETTER_AUTH_SECRET!, id)).catch(e => console.error('Sending notifications failed:', e)).finally(() => { sending = false })
     }, 10 * 1000)
     const port = Number(env.PORT ?? 3000)
     serve({ fetch: app.fetch, port }, () => console.log(`Listening on port ${port}`))
