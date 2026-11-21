@@ -28,6 +28,7 @@ test('anyone can create a community layer, and becomes its admin', { skip }, asy
     assert.equal(layer.code, 201)
     assert.match(layer.id, /^lay_[0-9a-z]+$/)
     assert.equal(layer.official, undefined)
+    assert.deepEqual(layer.fields.map((f: { key: string, type: string }) => [f.key, f.type]), [['name', 'text'], ['description', 'text'], ['color', 'color']])
 
     // It's committed by its creator, pushed, and built.
     assert.equal(git(dir, 'log', '-1', '--format=%an %s').trim(), 'steve Create the Farms layer')

@@ -31,10 +31,12 @@ const LayerEdit = z.object({
 
 const NewLayer = z.object({ name: Name, description: Description, dimension: z.enum(DIMENSIONS) }).strict()
 
-// What a new layer's objects start out with.
+// What a new layer's objects start out with. Areas are drawn in their Color
+// (see ObjectIndex.colors), or grey without one.
 const STARTING_FIELDS: Field[] = [
     { key: 'name', label: 'Name', type: 'text' },
     { key: 'description', label: 'Description', type: 'text' },
+    { key: 'color', label: 'Color', type: 'color', description: 'What color it is on the map' },
 ]
 
 export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, catchUp }: { markStale: () => Promise<void>, catchUp: () => Promise<void> }) {

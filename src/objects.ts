@@ -58,8 +58,10 @@ export class ObjectIndex {
         return this.references(o).map(ownTitle).filter(Boolean).join(' / ')
     }
 
-    // An object's color fields, or else the colors of what it references. A
-    // polygon claimed by several nations gets several colors.
+    // An object's color fields, or else the colors of what it references. So a
+    // community layer's area is its own Color, and a political area its
+    // nations' colors unless it has a Color of its own, which overrides them.
+    // A polygon claimed by several nations gets several colors.
     colors(o: MapObject): string[] {
         const colorsOf = (m: MapObject) => valuesOf(m.layer, m.object, 'color')
         const own = colorsOf(o)
