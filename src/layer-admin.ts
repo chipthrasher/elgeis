@@ -30,6 +30,8 @@ const field = (label: string, ...inputs: Node[]) => el('label', { class: 'field'
 
 export interface LayerInfo extends Layer {
     hidden: boolean
+    // Waiting for a site admin's approval.
+    pending: boolean
     createdBy: string | null
     creatorBanned: boolean
     admins: string[]
@@ -215,7 +217,8 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
     /* Moderation, for site admins */
 
     async function moderate() {
-        const layers = await api<LayerInfo[]>('layers')
+        // Those waiting for approval first.
+        const layers = (await api<LayerInfo[]>('layers')).sort((a, b) => Number(b.pending) - Number(a.pending))
         const error = errorBox()
         const act = (action: () => Promise<unknown>) => () => attempt(error, async () => {
             await action()
@@ -224,20 +227,24 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
 
         show('Moderate',
             el('h3', {}, 'Layers'),
-            el('p', { class: 'muted' }, 'Official layers show by default. Hiding a community layer takes it off the map until it\'s shown again.'),
+            el('p', { class: 'muted' }, 'Official layers show by default. New community layers wait for approval; rejecting one hides it. Hiding a community layer takes it off the map until it\'s shown again.'),
             el('div', { class: 'moderated' }, layers.map(l => el('div', { class: 'change' }, [
                 el('div', {}, [el('strong', {}, l.name), ' ', el('span', { class: 'muted' }, [
-                    l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`, l.creatorBanned && ' (banned)',
+                    l.pending ? 'Waiting for approval' : l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`, l.creatorBanned && ' (banned)',
                 ].filter(Boolean).join(''))]),
                 el('div', { class: 'row' }, [
                     button('Settings', () => settings(l.id), 'link'),
-                    !l.hidden && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
+                    l.pending && button('Approve', act(() => api(`layers/${l.id}/pending`, { approved: true })), 'link'),
+                    l.pending && button('Reject', act(async () => {
+                        if (confirm(`Reject ${l.name}? It will be hidden, which you can undo with Show.`)) await api(`layers/${l.id}/pending`, { approved: false })
+                    }), 'link'),
+                    !l.hidden && !l.pending && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
                         if (confirm(l.official
                             ? `Are you sure you want to make ${l.name} a community layer?\n\nIt will stop showing on the map by default. This is a potentially destructive action.`
                             : `Are you sure you want to make ${l.name} official?\n\nIt will show on the map by default. This is a potentially destructive action.`
                         )) await api(`layers/${l.id}/official`, { official: !l.official })
                     }), 'link'),
-                    !l.official && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
+                    !l.official && !l.pending && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
                     !l.official && button('Delete', act(async () => {
                         if (confirm(`Delete ${l.name}, and every change request to it, for good?`)) await api(`layers/${l.id}`, undefined, 'DELETE')
                     }), 'link'),

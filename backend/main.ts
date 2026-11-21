@@ -55,7 +55,7 @@ if (import.meta.main) {
     const db = createDb(env.DATABASE_URL!)
     await migrateToLatest(db)
 
-    const hidden = await db.selectFrom('layer').select('id').where('hidden', '=', true).execute()
+    const hidden = await db.selectFrom('layer').select('id').where(eb => eb.or([eb('hidden', '=', true), eb('pending', '=', true)])).execute()
     const repo = new LayersRepo(env.LAYERS_REPO!, env.LAYERS_BUILD!, env.LAYERS_REMOTE!, new Set(hidden.map(l => l.id)))
     // Pending layers, and banned accounts', too, which needs to know which are official.
     await hideLayers(db, repo)

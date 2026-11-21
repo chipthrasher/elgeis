@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import assert from 'node:assert/strict'
 import { objectVersion } from '../shared/changes.ts'
+import { sendQueued } from './notify.ts'
 import { testApp } from './test-app.ts'
 import { skip } from './test-db.ts'
 import { git, MANIFEST, NATION } from './test-layers.ts'
@@ -11,16 +12,18 @@ async function setup() {
     const t = await testApp()
     const steve = await t.signIn('steve@example.com', 'steve')
     const alex = await t.signIn('alex@example.com', 'alex')
-    const admin = await t.signIn('admin@example.com', 'admin')
-    await t.db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'admin').execute()
-    return { ...t, steve, alex, admin }
+    const admin = await t.signIn('admin@example.com', 'boss')
+    await t.db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'boss').execute()
+    // A site admin approves a new layer.
+    const approve = (layerId: string) => admin(`/api/layers/${layerId}/pending`, { approved: true })
+    return { ...t, steve, alex, admin, approve }
 }
 
 const json = async (response: Response) => ({ ...await response.json(), code: response.status })
 const index = (build: string) => JSON.parse(fs.readFileSync(path.join(build, 'index.json'), 'utf8')).map((l: { id: string }) => l.id).sort()
 
 test('anyone can create a community layer, and becomes its admin', { skip }, async () => {
-    const { steve, alex, browser, layers: { dir, remote, build } } = await setup()
+    const { steve, alex, approve, browser, layers: { dir, remote, build } } = await setup()
     assert.equal((await browser()('/api/layers', { name: 'Farms', dimension: 'overworld' })).status, 401)
     assert.equal((await steve('/api/layers', { name: 'Two\nlines', dimension: 'overworld' })).status, 400)
 
@@ -30,9 +33,17 @@ test('anyone can create a community layer, and becomes its admin', { skip }, asy
     assert.equal(layer.official, undefined)
     assert.deepEqual(layer.fields.map((f: { key: string, type: string }) => [f.key, f.type]), [['name', 'text'], ['description', 'text'], ['color', 'color']])
 
-    // It's committed by its creator, pushed, and built.
+    // It's committed by its creator and pushed, but waits for a site admin's
+    // approval before it's built, listed only for its admins until then.
+    assert.equal(layer.pending, true)
     assert.equal(git(dir, 'log', '-1', '--format=%an %s').trim(), 'steve Create the Farms layer')
     assert.equal(git(remote, 'rev-parse', 'HEAD'), git(dir, 'rev-parse', 'HEAD'))
+    assert.deepEqual(index(build), ['political'])
+    assert.deepEqual((await (await alex('/api/layers')).json()).map((l: { id: string }) => l.id), ['political'])
+    assert.equal((await (await steve('/api/layers')).json()).find((l: { id: string }) => l.id === layer.id).pending, true)
+    assert.equal((await steve(`/api/layers/${layer.id}/pending`, { approved: true })).status, 403)
+    assert.equal((await approve(layer.id)).status, 200)
+    assert.equal((await approve(layer.id)).status, 409)
     assert.deepEqual(index(build), [layer.id, 'political'])
 
     assert.deepEqual(await (await steve(`/api/layers/${layer.id}/admins`)).json(), ['steve'])
@@ -51,8 +62,9 @@ test('anyone can create a community layer, and becomes its admin', { skip }, asy
 })
 
 test("a layer's admins edit its schema and choose its other admins", { skip }, async () => {
-    const { steve, alex, admin, layers: { dir } } = await setup()
+    const { steve, alex, admin, approve, layers: { dir } } = await setup()
     const layer = await (await steve('/api/layers', { name: 'Farms', dimension: 'overworld' })).json()
+    await approve(layer.id)
     const object = { type: 'Feature', id: 'pnt_farm', geometry: { type: 'Point', coordinates: [1, 2] }, properties: { name: 'Wheat', description: 'Lots' } }
     const r = await (await steve('/api/requests', { layerId: layer.id, title: 'Add a farm', ops: [{ op: 'add', object }] })).json()
     await steve(`/api/requests/${r.id}/submit`, {})
@@ -109,8 +121,9 @@ test("a layer's admins edit its schema and choose its other admins", { skip }, a
 })
 
 test('site admins mark layers official, and hide or delete community layers', { skip }, async () => {
-    const { steve, alex, admin, db, layers: { build, dir } } = await setup()
+    const { steve, alex, admin, approve, db, layers: { build, dir } } = await setup()
     const layer = await (await steve('/api/layers', { name: 'Farms', dimension: 'overworld' })).json()
+    await approve(layer.id)
 
     assert.equal((await steve(`/api/layers/${layer.id}/official`, { official: true })).status, 403)
     assert.equal((await steve(`/api/layers/${layer.id}/hidden`, { hidden: true })).status, 403)
@@ -159,14 +172,15 @@ test('site admins mark layers official, and hide or delete community layers', { 
 })
 
 test('site admins list accounts, and ban and unban them', { skip }, async () => {
-    const { steve, alex, admin, db, signIn, layers: { build } } = await setup()
+    const { steve, alex, admin, approve, db, signIn, layers: { build } } = await setup()
     const layer = await (await steve('/api/layers', { name: 'Spam', dimension: 'overworld' })).json()
+    await approve(layer.id)
     const users = async (query = '') => (await admin(`/api/users${query}`)).json()
 
     // Newest first, with their layers, searchable by username or email.
     assert.equal((await steve('/api/users')).status, 403)
     const all = await users()
-    assert.deepEqual(all.users.map((u: { username: string, layers: number }) => [u.username, u.layers]), [['admin', 0], ['alex', 0], ['steve', 1]])
+    assert.deepEqual(all.users.map((u: { username: string, layers: number }) => [u.username, u.layers]), [['boss', 0], ['alex', 0], ['steve', 1]])
     assert.equal(all.more, false)
     assert.deepEqual((await users('?q=STEVE@')).users.map((u: { email: string }) => u.email), ['steve@example.com'])
     assert.deepEqual((await users('?q=LEX')).users.map((u: { username: string }) => u.username), ['alex'])
@@ -196,4 +210,48 @@ test('site admins list accounts, and ban and unban them', { skip }, async () => 
     assert.equal((await admin(`/api/users/${id}/banned`, { banned: false })).status, 200)
     assert.deepEqual(index(build), [layer.id, 'political'])
     assert.equal((await (await signIn('steve@example.com'))('/api/layers', { name: 'Farms', dimension: 'overworld' })).status, 201)
+})
+
+test('new layers wait for approval, unless their creator is trusted, and the site hears about them', { skip }, async () => {
+    const { steve, alex, admin, approve, db, browser, layers: { build } } = await setup()
+    const create = async (by: typeof steve, name: string) => (await by('/api/layers', { name, description: 'Some farms', dimension: 'overworld' })).json()
+    const queued = async () => (await db.selectFrom('emailQueue').select(['to', 'subject', 'text']).orderBy('id').execute()).at(-1)
+
+    // The site's own address gets links to approve or reject it.
+    const farms = await create(steve, 'Farms')
+    assert.equal(farms.pending, true)
+    const mail = (await queued())!
+    assert.equal(mail.to, 'Elgeis Map <map@example.com>')
+    assert.equal(mail.subject, 'New layer to approve: Farms')
+    assert.match(mail.text, /steve made a new community layer, "Farms":\n\nSome farms/)
+    const [approveLink, rejectLink] = [...mail.text.matchAll(/http\S+/g)].map(m => new URL(m[0]))
+    assert.equal(approveLink.pathname, `/api/layers/${farms.id}/approve`)
+    assert.equal(rejectLink.pathname, `/api/layers/${farms.id}/reject`)
+    const sent: { to: string, headers?: object }[] = []
+    await sendQueued(db, async (to, _subject, _text, headers) => { sent.push({ to, headers }) }, id => `link-for-${id}`)
+    assert.deepEqual(sent, [{ to: 'Elgeis Map <map@example.com>', headers: undefined }])
+
+    // Each link only does what it says, to its own layer.
+    const visit = (url: URL) => browser()(url.pathname + url.search)
+    assert.equal((await visit(new URL(`/api/layers/${farms.id}/reject${approveLink.search}`, approveLink))).status, 403)
+    const page = await visit(approveLink)
+    assert.equal(page.status, 200)
+    assert.match(await page.text(), /Approved Farms/)
+    assert.deepEqual(index(build), [farms.id, 'political'])
+    assert.match(await (await visit(rejectLink)).text(), /already approved/)
+
+    // Now steve runs a public layer, so his next one is public at once.
+    assert.equal((await create(steve, 'Mines')).pending, false)
+    // As are site admins'.
+    assert.equal((await create(admin, 'Roads')).pending, false)
+
+    // Rejecting hides it, which a site admin can undo.
+    const spam = await create(alex, 'Spam')
+    const reject = new URL([...(await queued())!.text.matchAll(/http\S+/g)][1][0])
+    assert.match(await (await visit(reject)).text(), /Rejected Spam/)
+    assert.equal((await (await admin('/api/layers')).json()).find((l: { id: string }) => l.id === spam.id).hidden, true)
+    assert.equal(index(build).includes(spam.id), false)
+    // And being an admin of a hidden layer doesn't make anyone trusted.
+    assert.equal((await create(alex, 'More')).pending, true)
+    assert.equal((await approve(spam.id)).status, 409)
 })
