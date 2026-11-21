@@ -30,16 +30,23 @@ const field = (label: string, ...inputs: Node[]) => el('label', { class: 'field'
 
 export interface LayerInfo extends Layer {
     hidden: boolean
+    // Waiting for a site admin's approval.
+    pending: boolean
     createdBy: string | null
+    creatorBanned: boolean
     admins: string[]
     canAdmin: boolean
 }
 
-interface AuthUser {
+interface UserInfo {
     id: string
-    username: string
-    displayUsername: string | null
+    username: string | null
+    email: string
+    createdAt: string
+    banned: boolean
     banReason: string | null
+    // How many layers they've made.
+    layers: number
 }
 
 export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) => Promise<FullLayer>) {
@@ -210,56 +217,121 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
     /* Moderation, for site admins */
 
     async function moderate() {
-        const layers = await api<LayerInfo[]>('layers')
+        // Those waiting for approval first.
+        const layers = (await api<LayerInfo[]>('layers')).sort((a, b) => Number(b.pending) - Number(a.pending))
         const error = errorBox()
         const act = (action: () => Promise<unknown>) => () => attempt(error, async () => {
             await action()
             moderate()
         })
 
-        const banned = (await api<{ users: AuthUser[] }>('auth/admin/list-users?filterField=banned&filterValue=true&limit=100')).users
-        const username = el('input', { placeholder: 'Username' })
-        const reason = el('input', { placeholder: 'Why (optional)' })
-        const ban = el('form', { class: 'row' }, [username, reason, el('button', {}, 'Ban')])
-        ban.addEventListener('submit', e => {
-            e.preventDefault()
-            act(async () => {
-                const { users } = await api<{ users: AuthUser[] }>(`auth/admin/list-users?filterField=username&filterValue=${encodeURIComponent(username.value.trim().toLowerCase())}`)
-                if (!users.length) throw new Error(`Nobody has the username "${username.value.trim()}"`)
-                await api('auth/admin/ban-user', { userId: users[0].id, banReason: reason.value.trim() || undefined })
-            })()
-        })
-
         show('Moderate',
             el('h3', {}, 'Layers'),
-            el('p', { class: 'muted' }, 'Official layers show by default. Hiding a community layer takes it off the map until it\'s shown again.'),
+            el('p', { class: 'muted' }, 'Official layers show by default. New community layers wait for approval; rejecting one hides it. Hiding a community layer takes it off the map until it\'s shown again.'),
             el('div', { class: 'moderated' }, layers.map(l => el('div', { class: 'change' }, [
                 el('div', {}, [el('strong', {}, l.name), ' ', el('span', { class: 'muted' }, [
-                    l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`,
+                    l.pending ? 'Waiting for approval' : l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`, l.creatorBanned && ' (banned)',
                 ].filter(Boolean).join(''))]),
                 el('div', { class: 'row' }, [
                     button('Settings', () => settings(l.id), 'link'),
-                    !l.hidden && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
+                    l.pending && button('Approve', act(() => api(`layers/${l.id}/pending`, { approved: true })), 'link'),
+                    l.pending && button('Reject', act(async () => {
+                        if (confirm(`Reject ${l.name}? It will be hidden, which you can undo with Show.`)) await api(`layers/${l.id}/pending`, { approved: false })
+                    }), 'link'),
+                    !l.hidden && !l.pending && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
                         if (confirm(l.official
                             ? `Are you sure you want to make ${l.name} a community layer?\n\nIt will stop showing on the map by default. This is a potentially destructive action.`
                             : `Are you sure you want to make ${l.name} official?\n\nIt will show on the map by default. This is a potentially destructive action.`
                         )) await api(`layers/${l.id}/official`, { official: !l.official })
                     }), 'link'),
-                    !l.official && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
+                    !l.official && !l.pending && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
                     !l.official && button('Delete', act(async () => {
                         if (confirm(`Delete ${l.name}, and every change request to it, for good?`)) await api(`layers/${l.id}`, undefined, 'DELETE')
                     }), 'link'),
                 ]),
             ]))),
-            el('h3', {}, 'Bans'),
-            el('p', { class: 'muted' }, 'Banned accounts are signed out, and can\'t sign in or suggest changes.'),
-            ban,
             error,
-            banned.length > 0 && el('div', { class: 'chips' }, banned.map(u => {
-                const unban = button('Unban', act(() => api('auth/admin/unban-user', { userId: u.id })), 'link')
-                return el('span', { class: 'chip', title: u.banReason ?? '' }, [u.displayUsername ?? u.username, ' ', unban])
-            })),
+            el('h3', {}, 'Accounts'),
+            el('p', { class: 'muted' }, "Banned accounts are signed out, can't sign in or suggest changes, and their community layers are hidden until they're unbanned."),
+            el('div', { class: 'row' }, button('Accounts…', () => users(moderate))),
         )
+    }
+
+    // A window listing every account, newest first, to search and ban or
+    // unban. Calls back once it's closed if anyone was banned or unbanned.
+    function users(changed: () => void) {
+        const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Accounts' })
+        const close = () => dialog.close()
+        let dirty = false
+        const search = el('input', { type: 'search', placeholder: 'Search by username or email' })
+        const bannedOnly = el('input', { type: 'checkbox' })
+        const list = el('div', { class: 'browse-list' })
+        const more = button('Show more', () => load(list.children.length), 'link')
+        const error = errorBox()
+
+        const row = (u: UserInfo): HTMLElement => {
+            const name = u.username ?? 'No username yet'
+            const toggle = button(u.banned ? 'Unban' : 'Ban', () => attempt(error, async () => {
+                let reason: string | null = ''
+                if (u.banned) {
+                    if (!confirm(`Unban ${name}? They'll be able to sign in again, and their community layers will come back.`)) return
+                } else {
+                    reason = prompt(`Ban ${name} (${u.email})?\n\nThey'll be signed out, won't be able to sign in or suggest changes, and their community layers will be hidden until they're unbanned.\n\nWhy? (optional)`)
+                    if (reason === null) return
+                }
+                await api(`users/${encodeURIComponent(u.id)}/banned`, { banned: !u.banned, reason: reason || undefined })
+                dirty = true
+                node.replaceWith(row({ ...u, banned: !u.banned, banReason: reason || null }))
+            }), 'link')
+            const node = el('div', { class: 'browse-row' }, [
+                el('span', { class: 'browse-text' }, [
+                    el('span', { class: 'browse-head' }, [
+                        el('span', { class: 'browse-name' }, name),
+                        u.banned && el('span', { class: 'banned', title: u.banReason ?? '' }, 'Banned'),
+                        el('span', { class: 'admins' }, `${u.layers} ${u.layers === 1 ? 'layer' : 'layers'}`),
+                    ]),
+                    el('small', {}, `${u.email}, joined ${new Date(u.createdAt).toLocaleDateString()}`),
+                ]),
+                toggle,
+            ])
+            return node
+        }
+
+        // From the start, or more after what's listed. Only the latest
+        // search's results are shown, however they arrive.
+        let latest = 0
+        const load = (offset = 0) => attempt(error, async () => {
+            const call = ++latest
+            const params = new URLSearchParams({ q: search.value.trim(), offset: String(offset) })
+            if (bannedOnly.checked) params.set('banned', 'true')
+            const page = await api<{ users: UserInfo[], more: boolean }>(`users?${params}`)
+            if (call !== latest) return
+            if (!offset) list.replaceChildren()
+            list.append(...page.users.map(row))
+            if (!list.children.length) list.append(el('p', { class: 'muted' }, 'Nobody matches.'))
+            more.hidden = !page.more
+        })
+        let typing: ReturnType<typeof setTimeout>
+        search.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(() => load(), 250) })
+        bannedOnly.addEventListener('change', () => load())
+
+        dialog.append(
+            el('div', { class: 'panel-head' }, [el('h2', {}, 'Accounts'), button('×', close, 'link close')]),
+            search,
+            el('label', { class: 'check' }, [bannedOnly, ' Only banned accounts']),
+            error,
+            list,
+            el('div', { class: 'row' }, more),
+        )
+        dialog.addEventListener('click', e => { if (e.target === dialog) close() })
+        dialog.addEventListener('close', () => {
+            dialog.remove()
+            if (dirty) changed()
+        })
+        document.body.append(dialog)
+        dialog.showModal()
+        search.focus()
+        load()
     }
 
     return { settings, moderate }

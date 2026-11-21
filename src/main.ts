@@ -48,10 +48,10 @@ async function main() {
         show: (...args) => editor.show(...args),
         settings: layerId => editor.settings(layerId),
         // Someone made a new layer: carry on to its settings.
-        created: l => {
+        created: (l, pending) => {
             addPanes(map, [l.layer.id])
             control.add(toggleOf(l))
-            editor.settings(l.layer.id)
+            editor.settings(l.layer.id, pending ? "Made. A site admin will look at it before it's listed for everyone; until then, only its admins see it." : '')
         },
     })
     const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap Scrape', group: dynmap, byDefault: true, stacks: false }], community.browse)

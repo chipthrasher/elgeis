@@ -1,7 +1,9 @@
 // Community layers: every layer that isn't official. They're hidden until a
 // viewer finds and turns them on from "See more" in the layers control, which adds them
 // to the top of its list (and so to ?layers=). Anyone signed in can make a new
-// one with "New layer", and becomes its admin.
+// one with "New layer", and becomes its admin. New layers wait for a site
+// admin's approval, unless their maker already runs a public layer; until
+// then, only their admins see them.
 
 import L from 'leaflet'
 import { DIMENSIONS, type Layer } from '../shared/layer.ts'
@@ -18,8 +20,9 @@ interface Options {
     control: () => LayerControl
     layers: MapLayer[]
     show: Show
-    // Called with a layer made here, before it's shown.
-    created: (mapLayer: MapLayer) => void
+    // Called with a layer made here, before it's shown, and whether it's
+    // waiting for approval.
+    created: (mapLayer: MapLayer, pending: boolean) => void
     // Opens a layer's settings, for its admins.
     settings: (layerId: string) => void
 }
@@ -41,10 +44,10 @@ export function createCommunity({ control, layers, show, created, settings }: Op
         form.addEventListener('submit', e => {
             e.preventDefault()
             attempt(error, async () => {
-                const layer = await api<Layer>('layers', { name: name.value, description: description.value, dimension: dimension.value })
+                const { pending, ...layer } = await api<Layer & { pending: boolean }>('layers', { name: name.value, description: description.value, dimension: dimension.value })
                 const l: MapLayer = { layer, objects: [], group: L.layerGroup() }
                 layers.push(l)
-                created(l)
+                created(l, pending)
                 control().setShown(layer.id, true)
             })
         })
@@ -63,12 +66,15 @@ export function createCommunity({ control, layers, show, created, settings }: Op
         // Who runs each layer, from the backend. Left out if it can't be reached.
         const infos = await api<LayerInfo[]>('layers').catch(() => [])
         const infoOf = (layerId: string) => infos.find(i => i.id === layerId)
-        const list = layers.filter(l => !l.layer.official)
+        // Plus layers waiting for approval that this viewer runs, which aren't
+        // on the map to turn on.
+        const waiting = infos.filter(i => i.pending && !layers.some(l => l.layer.id === i.id)).map(layer => ({ layer, loaded: false }))
+        const list = [...layers.map(l => ({ layer: l.layer, loaded: true })), ...waiting].filter(l => !l.layer.official)
             .sort((a, b) => a.layer.name.localeCompare(b.layer.name))
             .map(l => {
                 const admins = infoOf(l.layer.id)?.admins ?? []
                 // Ticked while it's in the layers control, even if it's unticked there.
-                const box = el('input', { type: 'checkbox', checked: control().isListed(l.layer.id) })
+                const box = el('input', { type: 'checkbox', checked: control().isListed(l.layer.id), disabled: !l.loaded })
                 box.addEventListener('change', () => control().setShown(l.layer.id, box.checked))
                 const gear = infoOf(l.layer.id)?.canAdmin && el('button', { type: 'button', class: 'link gear', title: 'Layer settings', 'aria-label': `Settings for ${l.layer.name}` }, '⚙')
                 if (gear) gear.addEventListener('click', () => { close(); settings(l.layer.id) })
@@ -81,6 +87,7 @@ export function createCommunity({ control, layers, show, created, settings }: Op
                                 admins.length > 0 && el('span', { class: 'admins' }, `${admins.length === 1 ? 'Admin' : 'Admins'}: ${admins.join(', ')}`),
                             ]),
                             l.layer.description && el('small', {}, l.layer.description),
+                            infoOf(l.layer.id)?.pending && el('small', {}, 'Waiting for a site admin to approve it. Only its admins see it until then.'),
                         ]),
                     ]),
                     gear,

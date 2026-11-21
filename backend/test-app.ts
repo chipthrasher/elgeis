@@ -18,7 +18,7 @@ export async function testApp(options: AppOptions = {}) {
         secret: 'test-secret-that-is-long-enough-to-use',
         sendMail: async (to, _subject, text) => { mail.push({ to, text }) },
     })
-    const { app, reconcile } = createApp(auth, db, layers.repo, SITE, options)
+    const { app, reconcile } = createApp(auth, db, layers.repo, SITE, { mailFrom: 'Elgeis Map <map@example.com>', ...options })
 
     // A tiny browser: keeps cookies and sends the site's Origin.
     function browser() {

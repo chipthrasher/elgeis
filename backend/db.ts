@@ -22,11 +22,18 @@ export interface Database {
         displayUsername: string | null
         // "admin" for site admins.
         role: string | null
+        // Banned by a site admin (see user-routes.ts).
         banned: boolean | null
+        banReason: string | null
+        banExpires: Timestamp | null
         // Ours: whether they get notification emails (see notify.ts).
         emailNotifications: Generated<boolean>
         createdAt: Generated<Date>
         updatedAt: Generated<Date>
+    }
+    session: {
+        id: string
+        userId: string
     }
     // Every layer, official or community. The manifest itself (name, schema)
     // is in the layers repo; this is what Postgres needs to know about it.
@@ -36,6 +43,9 @@ export interface Database {
         createdAt: Generated<Date>
         // Hidden by a site admin: left out of the community layer list.
         hidden: Generated<boolean>
+        // Made by someone new, and waiting for a site admin's approval
+        // before it's in the community layer list.
+        pending: Generated<boolean>
     }
     layerAdmin: {
         layerId: string
@@ -67,7 +77,9 @@ export interface Database {
     // Email notifications waiting to be sent (see notify.ts).
     emailQueue: {
         id: Generated<number>
-        userId: string
+        // Who it's for: a user, or else an address.
+        userId: string | null
+        to: string | null
         subject: string
         text: string
         createdAt: Generated<Date>

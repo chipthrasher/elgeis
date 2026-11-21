@@ -12,8 +12,8 @@ test('reviewers hear about submitted requests, and authors about what happens to
     const { db, signIn } = await testApp()
     const steve = await signIn('steve@example.com', 'steve')
     const alex = await signIn('alex@example.com', 'alex')
-    const admin = await signIn('admin@example.com', 'admin')
-    await db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'admin').execute()
+    const admin = await signIn('admin@example.com', 'boss')
+    await db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'boss').execute()
     const sent: { to: string, subject: string, text: string, headers?: Record<string, string> }[] = []
     const send = async () => {
         sent.length = 0
@@ -77,10 +77,10 @@ test('each address can only make so many changes a minute', { skip }, async () =
 test('anyone can turn notifications off, signed in or from the link in an email', { skip }, async () => {
     const { db, signIn, browser } = await testApp()
     const steve = await signIn('steve@example.com', 'steve')
-    const admin = await signIn('admin@example.com', 'admin')
-    await db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'admin').execute()
+    const admin = await signIn('admin@example.com', 'boss')
+    await db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'boss').execute()
     const sent: { to: string, text: string, headers?: Record<string, string> }[] = []
-    const { id: adminId } = await db.selectFrom('user').select('id').where('username', '=', 'admin').executeTakeFirstOrThrow()
+    const { id: adminId } = await db.selectFrom('user').select('id').where('username', '=', 'boss').executeTakeFirstOrThrow()
     const link = settingsLink(SITE, 'test-secret-that-is-long-enough-to-use', adminId)
     const submit = async () => {
         const r = await (await steve('/api/requests', { layerId: 'political', title: 'x', ops: [recolor('#00ff00')] })).json()

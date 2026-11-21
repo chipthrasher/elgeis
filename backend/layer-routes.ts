@@ -4,14 +4,22 @@
 // admins. Site admins can do all that on any layer, and decide which layers
 // are official (shown by default), and hide or delete community layers.
 //
+// A new layer waits for a site admin's approval before it's in the community
+// layer list, unless its creator is a site admin or already runs a public
+// layer. The site's own address is emailed links to approve or reject it.
+//
 // Manifests live in the layers repo, so editing one is a commit, made one at a
 // time like approvals. Whether a layer is hidden, who made it, and who its
 // admins are live in Postgres.
 
 import { Hono, type Context } from 'hono'
+import { html } from 'hono/html'
 import { z } from 'zod'
 import { DIMENSIONS, Field, Layer, newId, type LayerObject } from '../shared/layer.ts'
+import type { Db } from './db.ts'
 import { fail, isLayerAdmin, isSiteAdmin, parseBody, signedIn, siteAdmin, type Env } from './http.ts'
+import type { LayersRepo } from './layers.ts'
+import { notifyAddress, sign, signed } from './notify.ts'
 import { authorOf, type Deps } from './requests.ts'
 
 // Layer names end up in commit messages, so they're one line.
@@ -40,7 +48,23 @@ const STARTING_FIELDS: Field[] = [
     { key: 'color', label: 'Color', type: 'color', description: 'What color it is on the map' },
 ]
 
-export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, catchUp }: { markStale: () => Promise<void>, catchUp: () => Promise<void> }) {
+// Leave out of the map's static JSON, and so the community layer list, the
+// layers a site admin has hidden, those waiting for approval, and the
+// community layers of banned accounts.
+export async function hideLayers(db: Db, repo: LayersRepo) {
+    const rows = await db.selectFrom('layer').leftJoin('user', 'user.id', 'layer.createdBy').select('layer.id')
+        .where(eb => eb.or([eb('layer.hidden', '=', true), eb('layer.pending', '=', true), eb('user.banned', '=', true)])).execute()
+    const official = new Set(repo.data.filter(l => l.layer.official).map(l => l.layer.id))
+    repo.hidden = new Set(rows.map(r => r.id).filter(id => !official.has(id)))
+    repo.rebuild()
+}
+
+// What an emailed approve or reject link is signed with: that action, on that
+// layer, and nothing else.
+type Decision = 'approve' | 'reject'
+const decisionMessage = (layerId: string, decision: Decision) => `layer-${decision}:${layerId}`
+
+export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: Deps, { markStale, catchUp }: { markStale: () => Promise<void>, catchUp: () => Promise<void> }) {
     const app = new Hono<Env>()
 
     const find = (layerId: string) => {
@@ -86,24 +110,28 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
     /* Reading */
 
     // Every layer, with what the map's static JSON doesn't say: who made it,
-    // who its admins are, and whether it's hidden. Layers a site admin has
-    // hidden are only listed for site admins.
+    // who its admins are, whether a site admin has hidden it, and whether it's
+    // waiting for approval. Layers left out of the map are only listed for
+    // site admins and their own admins.
     app.get('/layers', async c => {
         const user = c.get('user')
         const rows = await db.selectFrom('layer').leftJoin('user', 'user.id', 'layer.createdBy')
-            .select(['layer.id', 'layer.hidden', 'user.username as createdBy']).execute()
+            .select(['layer.id', 'layer.hidden', 'layer.pending', 'user.username as createdBy', 'user.banned as creatorBanned']).execute()
         const admins = await db.selectFrom('layerAdmin').innerJoin('user', 'user.id', 'layerAdmin.userId')
             .select(['layerId', 'userId', 'user.username', 'user.displayUsername']).orderBy('layerAdmin.createdAt').execute()
         const adminsOf = (layerId: string) => admins.filter(a => a.layerId === layerId)
         return c.json(repo.data.flatMap(({ layer }) => {
             const row = rows.find(r => r.id === layer.id)
-            if (row?.hidden && !isSiteAdmin(user)) return []
+            const canAdmin = isSiteAdmin(user) || adminsOf(layer.id).some(a => a.userId === user?.id)
+            if (repo.hidden.has(layer.id) && !canAdmin) return []
             return [{
                 ...layer,
                 hidden: !!row?.hidden,
+                pending: !!row?.pending,
                 createdBy: row?.createdBy ?? null,
+                creatorBanned: !!row?.creatorBanned,
                 admins: adminsOf(layer.id).map(a => a.displayUsername ?? a.username),
-                canAdmin: isSiteAdmin(user) || adminsOf(layer.id).some(a => a.userId === user?.id),
+                canAdmin,
             }]
         }))
     })
@@ -120,12 +148,29 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
         const user = signedIn(c)
         const body = await parseBody(c, NewLayer)
         const layer: Layer = { id: newId('lay'), ...body, description: body.description || undefined, titleField: 'name', fields: STARTING_FIELDS }
+        const trusted = isSiteAdmin(user) || !!await db.selectFrom('layerAdmin').innerJoin('layer', 'layer.id', 'layerAdmin.layerId').select('layerId')
+            .where('userId', '=', user.id).where('pending', '=', false).where('hidden', '=', false).executeTakeFirst()
         await serially(async () => {
-            await save(user.id, layer, [], `Create the ${layer.name} layer\n\nCreated by ${user.username}.\n`)
-            await db.insertInto('layer').values({ id: layer.id, createdBy: user.id }).onConflict(oc => oc.doNothing()).execute()
+            // Its row first, so a pending layer is never built or given a
+            // public row by reconcile(), even if the backend stops midway.
+            await db.insertInto('layer').values({ id: layer.id, createdBy: user.id, pending: !trusted }).execute()
             await db.insertInto('layerAdmin').values({ layerId: layer.id, userId: user.id }).execute()
+            if (!trusted) repo.hidden.add(layer.id)
+            try {
+                await save(user.id, layer, [], `Create the ${layer.name} layer\n\nCreated by ${user.username}.\n`)
+            } catch (e) {
+                await db.deleteFrom('layer').where('id', '=', layer.id).execute()
+                throw e
+            }
         })
-        return c.json(layer, 201)
+        if (!trusted && mailFrom) {
+            const link = (decision: Decision) => `${siteUrl}/api/layers/${layer.id}/${decision}?token=${sign(secret, decisionMessage(layer.id, decision))}`
+            await notifyAddress(db, mailFrom, `New layer to approve: ${layer.name}`,
+                `${user.username} made a new community layer, "${layer.name}"` + (layer.description ? `:\n\n${layer.description}` : '.') +
+                `\n\nIt stays out of the community layer list until it's approved.\n\nApprove it: ${link('approve')}\n\nReject (hide) it: ${link('reject')}\n\n` +
+                `Or use Moderate on the map: ${siteUrl}/\n`)
+        }
+        return c.json({ ...layer, pending: !trusted }, 201)
     })
 
     /* Layer admins: the schema, and other admins */
@@ -171,7 +216,41 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
         return c.json(await adminList(data.layer.id))
     })
 
-    /* Site admins: official layers, and hiding and deleting community layers */
+    /* Site admins: approving new layers, official layers, and hiding and deleting community layers */
+
+    // Approving puts a pending layer in the community layer list. Rejecting
+    // hides it, which can be undone. Returns false if it wasn't pending.
+    const decide = (layerId: string, decision: Decision) => serially(async () => {
+        const row = await db.updateTable('layer').set({ pending: false, ...decision === 'reject' && { hidden: true } })
+            .where('id', '=', layerId).where('pending', '=', true).returning('id').executeTakeFirst()
+        if (row) await hideLayers(db, repo)
+        return !!row
+    })
+
+    app.post('/layers/:id/pending', async c => {
+        const { data } = moderated(c)
+        const { approved } = await parseBody(c, z.object({ approved: z.boolean() }).strict())
+        if (!await decide(data.layer.id, approved ? 'approve' : 'reject')) throw fail(409, "It isn't waiting for approval")
+        return c.json({ approved })
+    })
+
+    // The links in the email to the site's own address, which work without
+    // signing in. Each only approves, or only rejects, its one layer.
+    for (const decision of ['approve', 'reject'] as const) {
+        app.get(`/layers/:id/${decision}`, async c => {
+            const page = (status: 200 | 403 | 404, message: string) =>
+                c.html(html`<!doctype html><meta name="viewport" content="width=device-width"><title>Elgeis Map</title><p>${message}</p><p><a href="/">Back to the map</a></p>`, status)
+            const layerId = c.req.param('id')
+            if (!signed(secret, decisionMessage(layerId, decision), c.req.query('token') ?? '')) return page(403, "That link doesn't work.")
+            const layer = repo.data.find(l => l.layer.id === layerId)?.layer
+            const row = await db.selectFrom('layer').select('hidden').where('id', '=', layerId).executeTakeFirst()
+            if (!layer || !row) return page(404, 'That layer has been deleted.')
+            if (await decide(layerId, decision)) {
+                return page(200, decision === 'approve' ? `Approved ${layer.name}. It's in the community layer list now.` : `Rejected ${layer.name}. It's hidden.`)
+            }
+            return page(200, `${layer.name} isn't waiting for approval: it was already ${row.hidden ? 'rejected or hidden' : 'approved'}.`)
+        })
+    }
 
     app.post('/layers/:id/official', async c => {
         const user = siteAdmin(c)
@@ -182,6 +261,8 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
             if (!!layer.official === official) return
             await save(user.id, { ...layer, official: official || undefined }, [],
                 `${official ? 'Make' : 'Stop making'} the ${layer.name} layer official\n\nChanged by ${user.username}.\n`)
+            // A banned account's layer is hidden once it's a community layer.
+            if (!official) await hideLayers(db, repo)
         })
         return c.json(find(c.req.param('id')).layer)
     })
@@ -193,9 +274,7 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
         const { hidden } = await parseBody(c, z.object({ hidden: z.boolean() }).strict())
         await serially(async () => {
             await db.updateTable('layer').set({ hidden }).where('id', '=', data.layer.id).execute()
-            if (hidden) repo.hidden.add(data.layer.id)
-            else repo.hidden.delete(data.layer.id)
-            repo.rebuild()
+            await hideLayers(db, repo)
         })
         return c.json({ hidden })
     })
