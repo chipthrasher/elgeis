@@ -571,22 +571,45 @@ a {
   min-width: 0;
 }
 
-/* Each community layer: its name, with its admins on the right */
-.panel .community-head {
+/* "See more" in the layers control: community layers to turn on, each with
+   its admins on the right */
+.layer-control .see-more {
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--col-light);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.layer-control .more {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.layer-control .more:not(:empty) {
+  margin: 0.3rem 0 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 0.1rem solid var(--col-dark);
+}
+
+.layer-control .more-row {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
 }
 
-.panel .community .admins {
+.layer-control .more-row .admins {
   margin-left: auto;
-  text-align: right;
-  font-size: 0.8rem;
+  padding-left: 0.75rem;
+  font-size: 0.8em;
   color: var(--col-light);
 }
 
-.panel .community .help {
-  display: block;
+.layer-control .more .muted {
+  color: var(--col-light);
 }
 
 .panel .resolve {

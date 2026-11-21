@@ -1,8 +1,8 @@
 // The layers control: the layers being viewed, each with a checkbox, listed in
 // the order they're stacked, top first. Drag a layer by its handle (or move it
 // with the arrow keys) to draw it above or below the others. Official layers
-// are always listed; community layers once they're turned on in the community
-// layers list. The dynmap image is always at the bottom.
+// are always listed; community layers once they're turned on under "See more",
+// above the list. The dynmap image is always at the bottom.
 //
 // What's shown is kept in ?layers=, in the same order, top first, so views
 // can be shared. It's left out when the view is the default.
@@ -24,7 +24,8 @@ export interface Toggle {
 
 export type LayerControl = ReturnType<typeof createLayerControl>
 
-export function createLayerControl(map: L.Map, toggles: Toggle[]) {
+// `more` gives what "See more" shows: the layers that aren't listed by default.
+export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => Promise<Node[]>) {
     const byId = (id: string) => toggles.find(t => t.id === id)
     const defaults = toggles.filter(t => t.stacks && t.byDefault)
     // What can't be stacked is listed below the rest, in a fixed order.
@@ -55,10 +56,19 @@ export function createLayerControl(map: L.Map, toggles: Toggle[]) {
 
     /* The list */
 
-    const container = el('div', { class: 'leaflet-control-layers leaflet-control-layers-expanded layer-control' })
+    // "See more" opens a list above the layers, which stays open while they change.
+    const moreBox = el('div', { class: 'more' })
+    const moreButton = el('button', { type: 'button', class: 'see-more' }, 'See more')
+    moreButton.addEventListener('click', async () => {
+        const open = moreBox.childElementCount > 0
+        moreBox.replaceChildren(...open ? [] : await more())
+        moreButton.textContent = open ? 'See more' : 'See less'
+    })
+    const rows = el('div')
+    const container = el('div', { class: 'leaflet-control-layers leaflet-control-layers-expanded layer-control' }, [moreButton, moreBox, rows])
 
     function render() {
-        container.replaceChildren(...order.map(t => row(t, true)), ...fixed.map(t => row(t, false)))
+        rows.replaceChildren(...order.map(t => row(t, true)), ...fixed.map(t => row(t, false)))
     }
 
     function row(t: Toggle, movable: boolean) {
@@ -73,7 +83,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[]) {
         return node
     }
 
-    const movableRows = () => [...container.querySelectorAll<HTMLElement>('.layer-row.movable')]
+    const movableRows = () => [...rows.querySelectorAll<HTMLElement>('.layer-row.movable')]
     const orderOfRows = () => movableRows().map(r => byId(r.dataset.id!)!)
 
     function draggable(handle: HTMLElement, node: HTMLElement, t: Toggle) {
@@ -115,7 +125,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[]) {
             next.splice(i + step, 0, t)
             reorder(next)
             render()
-            container.querySelector<HTMLElement>(`[data-id="${t.id}"] .handle`)?.focus()
+            rows.querySelector<HTMLElement>(`[data-id="${t.id}"] .handle`)?.focus()
         })
     }
 
@@ -125,8 +135,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[]) {
     map.on('layeradd layerremove', e => {
         const t = toggles.find(t => t.group === e.layer)
         if (!t || !listed(t)) return
-        const box = container.querySelector<HTMLInputElement>(`[data-id="${t.id}"] input`)
-        if (box) box.checked = map.hasLayer(t.group)
+        for (const box of container.querySelectorAll<HTMLInputElement>(`[data-id="${t.id}"] input`)) box.checked = map.hasLayer(t.group)
         map.fire(e.type === 'layeradd' ? 'overlayadd' : 'overlayremove', { layer: t.group, name: t.name })
         save()
     })

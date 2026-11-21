@@ -20,8 +20,8 @@ const PAUSED = ['nether']
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
-    let openCommunity = () => {}
-    createAccount(document.querySelector('#account')!, () => [linkButton('Your layers', () => openCommunity())], async user => {
+    let openNewLayer = () => {}
+    createAccount(document.querySelector('#account')!, () => [linkButton('New layer', () => openNewLayer())], async user => {
         const editor = await ready
         // Reviewers get a link to what's waiting for them.
         const waiting = await api<unknown[]>('requests?review')
@@ -40,11 +40,11 @@ async function main() {
     // Everything that can be shown or hidden: each map layer, plus the dynmap
     // image beneath them. Official layers are listed in the layers control by
     // default, top first in the order they come in; community layers once
-    // they're turned on in their own list.
+    // they're turned on under its "See more".
     const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
-    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true, stacks: false }])
     const community = createCommunity({
-        map, layers, control,
+        map, layers,
+        control: () => control,
         show: (...args) => editor.show(...args),
         // Someone made a new layer: carry on to its settings.
         created: l => {
@@ -53,7 +53,8 @@ async function main() {
             editor.settings(l.layer.id)
         },
     })
-    openCommunity = community.open
+    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true, stacks: false }], community.seeMore)
+    openNewLayer = community.openNew
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
