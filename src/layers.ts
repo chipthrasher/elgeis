@@ -60,7 +60,7 @@ const PADDING = 1
 const polygonRenderer = L.svg({ pane: 'polygons', padding: PADDING })
 const lineRenderer = L.svg({ padding: PADDING })
 
-function draw(layer: Layer, object: LayerObject): L.GeoJSON {
+export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     const scale = DIMENSION_SCALE[layer.dimension]
     const ring = layer.fields.some(f => f.ring && object.properties[f.key] === true)
 
@@ -87,8 +87,9 @@ function draw(layer: Layer, object: LayerObject): L.GeoJSON {
 
 // Fill polygons with their colors (their own, or their nation's). A polygon
 // with several colors, like one claimed by several nations, is hatched in all
-// of them.
-export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => string[]) {
+// of them. Patterns' IDs start with `prefix`, so several sets can coexist.
+// Returns a function that removes the patterns.
+export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => string[], prefix = 'hatch') {
     const patterns = new Map<string, string>()
     const defs = document.createElementNS(SVG_NS, 'defs')
 
@@ -102,7 +103,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
         }
         const key = colors.join(',')
         if (!patterns.has(key)) {
-            const id = `hatch-${patterns.size}`
+            const id = `${prefix}-${patterns.size}`
             patterns.set(key, id)
             defs.append(hatch(id, colors))
         }
@@ -114,6 +115,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
     svg.setAttribute('class', 'patterns')
     svg.append(defs)
     document.body.append(svg)
+    return () => svg.remove()
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg'

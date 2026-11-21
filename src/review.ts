@@ -1,6 +1,6 @@
-// Shows a change request: each change on the map (the old shape in red, the
-// new one in green, with a switch to see just before or just after) with its
-// changed properties, warnings about borders that
+// Shows a change request: what it changes on the map, drawn as the map draws
+// it (with a switch between before and after, and everything else hidden),
+// with its changed properties, warnings about borders that
 // overlap or leave gaps, and comments. Reviewers approve or reject it here,
 // and authors follow it.
 
@@ -11,8 +11,11 @@ import { borderWarnings, polygonParts } from '../shared/geometry.ts'
 import { DIMENSION_SCALE, valuesOf, type Field, type Layer, type LayerObject, type PropertyValue } from '../shared/layer.ts'
 import type { ChangeRequest, FullLayer } from './api.ts'
 import { el } from './dom.ts'
+import { addLabels } from './labels.ts'
+import { colorPolygons, draw, type MapLayer, type MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 import type { Names } from './names.ts'
+import { ObjectIndex } from './objects.ts'
 
 const VERBS = { add: 'Add', update: 'Change', delete: 'Delete' }
 
@@ -40,20 +43,30 @@ const disputed = (layer: Layer, o: LayerObject) => valuesOf(layer, o, 'entities'
 
 // Draw the request's changes on the map, and list them. Returns a function
 // that removes what it drew.
-export function showChanges(map: L.Map, names: Names, data: FullLayer, request: ChangeRequest, list: HTMLElement): () => void {
+export function showChanges(map: L.Map, layers: MapLayer[], index: ObjectIndex, names: Names, data: FullLayer, request: ChangeRequest, list: HTMLElement): () => void {
     const { layer } = data
     const field = (key: string) => layer.fields.find(f => f.key === key)
     const scale = DIMENSION_SCALE[layer.dimension]
-    const oldGroup = L.featureGroup()
-    const newGroup = L.featureGroup()
-    const group = L.featureGroup([oldGroup, newGroup]).addTo(map)
-    const draw = (object: LayerObject | undefined, className: string, to: L.FeatureGroup) => {
-        if (!object?.geometry) return
-        L.geoJSON(object as GeoJsonObject, {
-            coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
-            pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 6 }),
-            style: { className, interactive: false },
-        }).addTo(to)
+    const changed = new Set(request.ops.map(opId))
+    const warnings: L.Layer[] = []
+    const bounds = L.latLngBounds([])
+    const extend = (object: LayerObject | undefined) => {
+        if (object?.geometry) bounds.extend(L.geoJSON(object as GeoJsonObject, { coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale) }).getBounds())
+    }
+
+    // Draw the layer as it is in `state`, as the map would: what the request
+    // changes, and what points to it (a changed nation's areas).
+    function drawState(state: Map<string, LayerObject>, extras: L.Layer[] = []): () => void {
+        const others = index.all.filter(o => o.layer.id !== layer.id).map(o => ({ ...o, drawn: null }))
+        const mine: MapObject[] = [...state.values()].map(object => ({ object, layer, drawn: null }))
+        const stateIndex = new ObjectIndex([...others, ...mine])
+        const shown = mine.filter(o => o.object.geometry && !o.object.properties.hidden &&
+            (changed.has(o.object.id) || stateIndex.references(o).some(r => changed.has(r.object.id))))
+        const group = L.featureGroup(extras).addTo(map)
+        for (const o of shown) o.drawn = draw(layer, o.object).addTo(group)
+        const uncolor = colorPolygons(shown, o => stateIndex.colors(o), 'review')
+        const unlabel = addLabels(map, shown, o => stateIndex.label(o))
+        return () => { group.remove(); uncolor(); unlabel() }
     }
 
     // The layer as it would be, for checking borders.
@@ -71,8 +84,8 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
     for (const op of request.ops) {
         const before = done ? undefined : data.objects.find(o => o.id === opId(op))
         const next = op.op === 'delete' ? undefined : op.object
-        draw(before, 'diff-old', oldGroup)
-        draw(next, 'diff-new', newGroup)
+        extend(before)
+        extend(next)
 
         const rows = op.op === 'delete' ? [] : changedFields(layer, before ?? { ...op.object, properties: {} }, op.object)
         const geometryChanged = JSON.stringify(before?.geometry ?? null) !== JSON.stringify(next?.geometry ?? null)
@@ -96,22 +109,25 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
                 const neighbor = after.get(w.with)
                 const name = (neighbor && names.describe(layer, neighbor)) || w.with
                 item.append(el('div', { class: 'warning' }, `${w.kind === 'overlap' ? 'Overlaps' : 'Leaves a gap with'} ${name} near ${w.at.map(Math.round).join(', ')}`))
-                L.circleMarker(toLatLng(w.at[0] * scale, w.at[1] * scale), { radius: 10, className: 'diff-warning', interactive: false }).addTo(newGroup)
+                warnings.push(L.circleMarker(toLatLng(w.at[0] * scale, w.at[1] * scale), { radius: 10, className: 'diff-warning', interactive: false }))
             }
         }
         list.append(item)
     }
 
-    // Switch between the map before, after, or both at once.
-    if (oldGroup.getLayers().length) {
-        const views = { Before: [oldGroup], Both: [oldGroup, newGroup], After: [newGroup] }
-        const buttons = Object.entries(views).map(([label, shown]) => {
+    // Hide the map's layers, so only what the request touches shows.
+    const hidden = layers.filter(l => map.hasLayer(l.group))
+    for (const l of hidden) l.group.remove()
+
+    // Switch between the layer before and after the request.
+    const views = { Before: () => drawState(new Map(data.objects.map(o => [o.id, o]))), After: () => drawState(after, warnings) }
+    let undraw = views.After()
+    if (!done) {
+        const buttons = Object.entries(views).map(([label, view]) => {
             const b = el('button', { type: 'button' }, label)
             b.addEventListener('click', () => {
-                for (const g of [oldGroup, newGroup]) {
-                    if (shown.includes(g)) group.addLayer(g)
-                    else group.removeLayer(g)
-                }
+                undraw()
+                undraw = view()
                 for (const other of buttons) other.classList.toggle('on', other === b)
             })
             return b
@@ -120,7 +136,9 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
         list.prepend(el('div', { class: 'toggle' }, buttons))
     }
 
-    const bounds = group.getBounds()
     if (bounds.isValid()) map.flyToBounds(bounds, { maxZoom: -1, padding: [80, 80], duration: 0.5 })
-    return () => group.remove()
+    return () => {
+        undraw()
+        for (const l of hidden) l.group.addTo(map)
+    }
 }

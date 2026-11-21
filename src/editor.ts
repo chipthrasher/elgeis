@@ -537,10 +537,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 request.mine && OPEN_STATUSES.includes(request.status) && button('Withdraw', act('withdraw', myRequests), 'link'),
             ]),
         )
-        // Hide what's on the map now, so only the request's before and after show.
-        const showDrawn = hideDrawn(request.ops.map(opId))
-        const hideChanges = showChanges(map, names, data, request, changes)
-        cleanup = () => { hideChanges(); showDrawn() }
+        cleanup = showChanges(map, layers, index, names, data, request, changes)
     }
 
     // Point a stale request's changes at the latest versions, dropping
