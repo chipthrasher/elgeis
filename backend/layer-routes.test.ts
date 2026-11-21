@@ -38,7 +38,9 @@ test('anyone can create a community layer, and becomes its admin', { skip }, asy
     assert.equal((await json(await steve(`/api/layers/${layer.id}`))).canReview, true)
     assert.equal((await json(await alex(`/api/layers/${layer.id}`))).canReview, false)
     const list = await (await alex('/api/layers')).json()
-    assert.deepEqual(list.map((l: { id: string, createdBy: string, canAdmin: boolean }) => [l.id, l.createdBy, l.canAdmin]), [[layer.id, 'steve', false], ['political', null, false]])
+    assert.deepEqual(list.map((l: { id: string, createdBy: string, admins: string[], canAdmin: boolean }) => [l.id, l.createdBy, l.admins, l.canAdmin]),
+        [[layer.id, 'steve', ['steve'], false], ['political', null, [], false]])
+    assert.equal((await (await steve('/api/layers')).json())[0].canAdmin, true)
 
     // Anyone can suggest changes to it, and its admin reviews them.
     const object = { type: 'Feature', id: 'pnt_farm', geometry: { type: 'Point', coordinates: [1, 2] }, properties: { name: 'Wheat' } }

@@ -571,6 +571,20 @@ a {
   min-width: 0;
 }
 
+/* Each community layer: its name, with its admins on the right */
+.panel .community-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.panel .community .admins {
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--col-light);
+}
+
 .panel .community .help {
   display: block;
 }

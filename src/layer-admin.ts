@@ -31,6 +31,7 @@ const field = (label: string, ...inputs: Node[]) => el('label', { class: 'field'
 export interface LayerInfo extends Layer {
     hidden: boolean
     createdBy: string | null
+    admins: string[]
     canAdmin: boolean
 }
 

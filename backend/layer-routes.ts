@@ -81,17 +81,26 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
 
     /* Reading */
 
-    // Every layer, with what the map's static JSON doesn't say. Layers a site
-    // admin has hidden are only listed for site admins.
+    // Every layer, with what the map's static JSON doesn't say: who made it,
+    // who its admins are, and whether it's hidden. Layers a site admin has
+    // hidden are only listed for site admins.
     app.get('/layers', async c => {
         const user = c.get('user')
         const rows = await db.selectFrom('layer').leftJoin('user', 'user.id', 'layer.createdBy')
             .select(['layer.id', 'layer.hidden', 'user.username as createdBy']).execute()
-        const mine = new Set(user ? (await db.selectFrom('layerAdmin').select('layerId').where('userId', '=', user.id).execute()).map(r => r.layerId) : [])
+        const admins = await db.selectFrom('layerAdmin').innerJoin('user', 'user.id', 'layerAdmin.userId')
+            .select(['layerId', 'userId', 'user.username', 'user.displayUsername']).orderBy('layerAdmin.createdAt').execute()
+        const adminsOf = (layerId: string) => admins.filter(a => a.layerId === layerId)
         return c.json(repo.data.flatMap(({ layer }) => {
             const row = rows.find(r => r.id === layer.id)
             if (row?.hidden && !isSiteAdmin(user)) return []
-            return [{ ...layer, hidden: !!row?.hidden, createdBy: row?.createdBy ?? null, canAdmin: isSiteAdmin(user) || mine.has(layer.id) }]
+            return [{
+                ...layer,
+                hidden: !!row?.hidden,
+                createdBy: row?.createdBy ?? null,
+                admins: adminsOf(layer.id).map(a => a.displayUsername ?? a.username),
+                canAdmin: isSiteAdmin(user) || adminsOf(layer.id).some(a => a.userId === user?.id),
+            }]
         }))
     })
 

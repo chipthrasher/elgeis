@@ -7,6 +7,7 @@ import L from 'leaflet'
 import { DIMENSIONS, type Layer } from '../shared/layer.ts'
 import { api } from './api.ts'
 import { attempt, el, errorBox } from './dom.ts'
+import type { LayerInfo } from './layer-admin.ts'
 import type { MapLayer } from './layers.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
@@ -35,7 +36,7 @@ export function createCommunity({ map, control, layers, show, created }: Options
     }
     for (const l of community()) if (map.hasLayer(l.group)) control.addOverlay(l.group, l.layer.name)
 
-    function open() {
+    async function open() {
         const name = el('input', { required: true, placeholder: 'Name' })
         const description = el('input', { placeholder: 'What it shows (optional)' })
         const dimension = el('select', {}, DIMENSIONS.map(d => el('option', { value: d }, d === 'overworld' ? 'Overworld' : 'Nether')))
@@ -59,16 +60,24 @@ export function createCommunity({ map, control, layers, show, created }: Options
         })
 
         const list = community()
+        // Who runs each layer, from the backend. Left out if it can't be reached.
+        const infos = await api<LayerInfo[]>('layers').catch(() => [])
+        const adminsOf = (layerId: string) => infos.find(i => i.id === layerId)?.admins ?? []
         show('Community layers',
             el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to see them.'),
             list.length === 0 && el('p', { class: 'muted' }, 'There are none yet.'),
             ...list.map(l => {
                 const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
                 box.addEventListener('change', () => setShown(l, box.checked))
-                return el('label', { class: 'check community' }, [box, ' ', el('span', {}, [
-                    l.layer.name,
+                const admins = adminsOf(l.layer.id)
+                return el('label', { class: 'check community' }, [
+                    el('span', { class: 'community-head' }, [
+                        box,
+                        el('span', {}, l.layer.name),
+                        admins.length > 0 && el('span', { class: 'admins' }, `${admins.length === 1 ? 'Admin' : 'Admins'}: ${admins.join(', ')}`),
+                    ]),
                     l.layer.description && el('small', { class: 'help' }, l.layer.description),
-                ])])
+                ])
             }),
             el('h3', {}, 'Make your own'),
             el('p', { class: 'muted' }, "Once it's made, anyone can suggest things to add to it, and you decide what goes on."),
