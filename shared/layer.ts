@@ -66,6 +66,8 @@ export type Field = z.infer<typeof Field>
 export const Layer = z.object({
     id: LayerId,
     name: z.string().min(1),
+    // What the layer shows, under its name in the directory.
+    description: z.string().min(1).optional(),
     dimension: z.enum(DIMENSIONS),
     // Official layers show by default.
     official: z.boolean().optional(),
