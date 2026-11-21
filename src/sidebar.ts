@@ -127,7 +127,10 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             .sort((a, b) => index.title(a).localeCompare(index.title(b)))
         if (entries.length === 0) continue
 
-        const section = el('section', {}, el('h2', {}, mapLayer.layer.name))
+        const section = el('section', {}, [
+            el('h2', {}, mapLayer.layer.name),
+            mapLayer.layer.description && el('p', { class: 'layer-description' }, mapLayer.layer.description),
+        ])
         for (const o of entries) {
             const item = buildItem(o)
             items.set(o, item)
