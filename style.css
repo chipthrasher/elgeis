@@ -1111,3 +1111,13 @@ path.editing {
 }
 
 .leaflet-control-coordinates strong {}
+
+/* The accounts window, in Moderate: the community layers window's look */
+dialog.browse .banned {
+  font-size: 0.8rem;
+  color: var(--col-pastel-red);
+}
+
+dialog.browse .browse-row > button {
+  align-self: center;
+}

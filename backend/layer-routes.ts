@@ -11,7 +11,9 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { DIMENSIONS, Field, Layer, newId, type LayerObject } from '../shared/layer.ts'
+import type { Db } from './db.ts'
 import { fail, isLayerAdmin, isSiteAdmin, parseBody, signedIn, siteAdmin, type Env } from './http.ts'
+import type { LayersRepo } from './layers.ts'
 import { authorOf, type Deps } from './requests.ts'
 
 // Layer names end up in commit messages, so they're one line.
@@ -39,6 +41,16 @@ const STARTING_FIELDS: Field[] = [
     { key: 'description', label: 'Description', type: 'text' },
     { key: 'color', label: 'Color', type: 'color', description: 'What color it is on the map' },
 ]
+
+// Leave out of the map's static JSON, and so the community layer list, the
+// layers a site admin has hidden, and the community layers of banned accounts.
+export async function hideLayers(db: Db, repo: LayersRepo) {
+    const rows = await db.selectFrom('layer').leftJoin('user', 'user.id', 'layer.createdBy').select('layer.id')
+        .where(eb => eb.or([eb('layer.hidden', '=', true), eb('user.banned', '=', true)])).execute()
+    const official = new Set(repo.data.filter(l => l.layer.official).map(l => l.layer.id))
+    repo.hidden = new Set(rows.map(r => r.id).filter(id => !official.has(id)))
+    repo.rebuild()
+}
 
 export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, catchUp }: { markStale: () => Promise<void>, catchUp: () => Promise<void> }) {
     const app = new Hono<Env>()
@@ -86,22 +98,23 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
     /* Reading */
 
     // Every layer, with what the map's static JSON doesn't say: who made it,
-    // who its admins are, and whether it's hidden. Layers a site admin has
-    // hidden are only listed for site admins.
+    // who its admins are, and whether a site admin has hidden it. Hidden
+    // layers, and those of banned accounts, are only listed for site admins.
     app.get('/layers', async c => {
         const user = c.get('user')
         const rows = await db.selectFrom('layer').leftJoin('user', 'user.id', 'layer.createdBy')
-            .select(['layer.id', 'layer.hidden', 'user.username as createdBy']).execute()
+            .select(['layer.id', 'layer.hidden', 'user.username as createdBy', 'user.banned as creatorBanned']).execute()
         const admins = await db.selectFrom('layerAdmin').innerJoin('user', 'user.id', 'layerAdmin.userId')
             .select(['layerId', 'userId', 'user.username', 'user.displayUsername']).orderBy('layerAdmin.createdAt').execute()
         const adminsOf = (layerId: string) => admins.filter(a => a.layerId === layerId)
         return c.json(repo.data.flatMap(({ layer }) => {
             const row = rows.find(r => r.id === layer.id)
-            if (row?.hidden && !isSiteAdmin(user)) return []
+            if (repo.hidden.has(layer.id) && !isSiteAdmin(user)) return []
             return [{
                 ...layer,
                 hidden: !!row?.hidden,
                 createdBy: row?.createdBy ?? null,
+                creatorBanned: !!row?.creatorBanned,
                 admins: adminsOf(layer.id).map(a => a.displayUsername ?? a.username),
                 canAdmin: isSiteAdmin(user) || adminsOf(layer.id).some(a => a.userId === user?.id),
             }]
@@ -182,6 +195,8 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
             if (!!layer.official === official) return
             await save(user.id, { ...layer, official: official || undefined }, [],
                 `${official ? 'Make' : 'Stop making'} the ${layer.name} layer official\n\nChanged by ${user.username}.\n`)
+            // A banned account's layer is hidden once it's a community layer.
+            if (!official) await hideLayers(db, repo)
         })
         return c.json(find(c.req.param('id')).layer)
     })
@@ -193,9 +208,7 @@ export function layerRoutes({ db, repo, siteUrl, serially }: Deps, { markStale, 
         const { hidden } = await parseBody(c, z.object({ hidden: z.boolean() }).strict())
         await serially(async () => {
             await db.updateTable('layer').set({ hidden }).where('id', '=', data.layer.id).execute()
-            if (hidden) repo.hidden.add(data.layer.id)
-            else repo.hidden.delete(data.layer.id)
-            repo.rebuild()
+            await hideLayers(db, repo)
         })
         return c.json({ hidden })
     })

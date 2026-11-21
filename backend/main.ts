@@ -6,13 +6,14 @@ import { HTTPException } from 'hono/http-exception'
 import { createAuth, type Auth } from './auth.ts'
 import { createDb, type Db } from './db.ts'
 import { currentUser, queue, type Env } from './http.ts'
-import { layerRoutes } from './layer-routes.ts'
+import { hideLayers, layerRoutes } from './layer-routes.ts'
 import { LayersRepo } from './layers.ts'
 import { createMailer } from './mail.ts'
 import { migrateToLatest } from './migrate.ts'
 import { notificationRoutes, sendQueued, settingsLink } from './notify.ts'
 import { rateLimit, RATE_LIMIT } from './rate-limit.ts'
 import { requestRoutes } from './requests.ts'
+import { userRoutes } from './user-routes.ts'
 
 export interface AppOptions {
     // How many changes each address can make to the API a minute, or false
@@ -33,6 +34,7 @@ export function createApp(auth: Auth, db: Db, repo: LayersRepo, siteUrl: string,
     api.use(currentUser(auth))
     api.route('/', requests.app)
     api.route('/', layerRoutes(deps, requests))
+    api.route('/', userRoutes(deps))
     api.route('/', notificationRoutes(db, auth.options.secret!))
     app.route('/', api)
 
@@ -52,6 +54,8 @@ if (import.meta.main) {
 
     const hidden = await db.selectFrom('layer').select('id').where('hidden', '=', true).execute()
     const repo = new LayersRepo(env.LAYERS_REPO!, env.LAYERS_BUILD!, env.LAYERS_REMOTE!, new Set(hidden.map(l => l.id)))
+    // Banned accounts' layers too, which needs to know which are official.
+    await hideLayers(db, repo)
     const sendMail = createMailer(env.SMTP_URL!, env.MAIL_FROM!)
     const auth = createAuth(db, { siteUrl: env.SITE_URL!, secret: env.BETTER_AUTH_SECRET!, sendMail })
     const { app, reconcile } = createApp(auth, db, repo, env.SITE_URL!)

@@ -158,10 +158,42 @@ test('site admins mark layers official, and hide or delete community layers', { 
     assert.ok(fs.existsSync(path.join(dir, nations.id, 'layer.json')))
 })
 
-test('banned accounts can do nothing', { skip }, async () => {
-    const { steve, admin, db } = await setup()
-    const { id } = await db.selectFrom('user').select('id').where('username', '=', 'steve').executeTakeFirstOrThrow()
-    assert.equal((await admin('/api/auth/admin/ban-user', { userId: id, banReason: 'Spam' })).status, 200)
-    assert.equal((await steve('/api/layers', { name: 'Spam', dimension: 'overworld' })).status, 401)
+test('site admins list accounts, and ban and unban them', { skip }, async () => {
+    const { steve, alex, admin, db, signIn, layers: { build } } = await setup()
+    const layer = await (await steve('/api/layers', { name: 'Spam', dimension: 'overworld' })).json()
+    const users = async (query = '') => (await admin(`/api/users${query}`)).json()
+
+    // Newest first, with their layers, searchable by username or email.
+    assert.equal((await steve('/api/users')).status, 403)
+    const all = await users()
+    assert.deepEqual(all.users.map((u: { username: string, layers: number }) => [u.username, u.layers]), [['admin', 0], ['alex', 0], ['steve', 1]])
+    assert.equal(all.more, false)
+    assert.deepEqual((await users('?q=STEVE@')).users.map((u: { email: string }) => u.email), ['steve@example.com'])
+    assert.deepEqual((await users('?q=LEX')).users.map((u: { username: string }) => u.username), ['alex'])
+    assert.deepEqual((await users('?q=_')).users, [])
+    assert.deepEqual((await users('?offset=2')).users.map((u: { username: string }) => u.username), ['steve'])
+    const id = all.users.find((u: { username: string }) => u.username === 'steve').id
+
+    // Only site admins ban, and not themselves.
+    assert.equal((await alex(`/api/users/${id}/banned`, { banned: true })).status, 403)
+    assert.equal((await admin(`/api/users/${all.users[0].id}/banned`, { banned: true })).status, 409)
+    assert.equal((await admin('/api/users/nobody/banned', { banned: true })).status, 404)
+
+    // Banned accounts are signed out, can't sign in or do anything, and their
+    // layers are hidden, except from site admins.
+    assert.equal((await admin(`/api/users/${id}/banned`, { banned: true, reason: 'Spam' })).status, 200)
+    assert.deepEqual((await users('?banned=true')).users.map((u: { username: string, banReason: string }) => [u.username, u.banReason]), [['steve', 'Spam']])
+    assert.equal((await db.selectFrom('session').select('id').where('userId', '=', id).execute()).length, 0)
+    assert.equal((await steve('/api/layers', { name: 'More spam', dimension: 'overworld' })).status, 401)
+    assert.equal(await (await (await signIn('steve@example.com'))('/api/auth/get-session')).json(), null)
+    assert.notEqual(await (await alex('/api/auth/get-session')).json(), null)
     assert.equal((await steve('/api/requests', { layerId: 'political', title: 'x', ops: [{ op: 'delete', id: 'pol_a', baseVersion: objectVersion(NATION) }] })).status, 401)
+    assert.deepEqual(index(build), ['political'])
+    assert.equal((await (await alex('/api/layers')).json()).length, 1)
+    assert.equal((await (await admin('/api/layers')).json()).find((l: { id: string }) => l.id === layer.id).creatorBanned, true)
+
+    // Unbanning brings their layers back.
+    assert.equal((await admin(`/api/users/${id}/banned`, { banned: false })).status, 200)
+    assert.deepEqual(index(build), [layer.id, 'political'])
+    assert.equal((await (await signIn('steve@example.com'))('/api/layers', { name: 'Farms', dimension: 'overworld' })).status, 201)
 })
