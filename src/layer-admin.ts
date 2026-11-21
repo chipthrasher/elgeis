@@ -45,7 +45,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
     /* A layer's settings, for its admins */
 
     async function settings(layerId: string, notice = '') {
-        const { layer } = await load(layerId, true)
+        const { layer, objects } = await load(layerId, true)
         const fields: Field[] = layer.fields.map(f => ({ ...f }))
         // Fields added here, whose keys come from their labels when saved.
         const added = new Set<Field>()
@@ -100,13 +100,28 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                         added.has(f) ? el('span', { class: 'muted' }, 'New') : el('code', { class: 'muted' }, f.key),
                         i > 0 && button('↑', move(-1), 'link'),
                         i < fields.length - 1 && button('↓', move(1), 'link'),
-                        button('Remove', () => { fields.splice(i, 1); render() }, 'link'),
+                        button('Remove', () => {
+                            if (!added.has(f) && !confirmRemoval(f)) return
+                            fields.splice(i, 1)
+                            render()
+                        }, 'link'),
                     ]),
                 ])
             }))
             renderChoices()
         }
         render()
+
+        // Removing a saved field throws away every value it holds, so check first.
+        function confirmRemoval(f: Field) {
+            const holding = objects.filter(o => o.properties[f.key] !== undefined && o.properties[f.key] !== '').length
+            const name = f.label || f.key
+            return confirm(`Remove the "${name}" field?\n\n` + (holding
+                ? `${holding} ${holding === 1 ? 'thing' : 'things'} in ${layer.name} ${holding === 1 ? 'has' : 'have'} a value for it. ` +
+                  `When you save, those values are deleted from all of them, and anyone's change requests that set "${name}" will need updating.`
+                : `Nothing in ${layer.name} has a value for it yet, so nothing is lost.`) +
+                `\n\nIt only happens when you save. Adding the field back later won't bring the values back.`)
+        }
 
         const error = errorBox()
         const save = () => attempt(error, async () => {
@@ -208,7 +223,15 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                 ].filter(Boolean).join(''))]),
                 el('div', { class: 'row' }, [
                     button('Settings', () => settings(l.id), 'link'),
-                    !l.hidden && button(l.official ? 'Make it a community layer' : 'Make it official', act(() => api(`layers/${l.id}/official`, { official: !l.official })), 'link'),
+                    !l.hidden && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
+                        if (confirm(l.official
+                            ? `Make ${l.name} a community layer?\n\nIt will stop showing on the map by default, so most visitors won't see it ` +
+                              `unless they turn it on in the community layers list. Shared links that name it in ?layers= still show it. ` +
+                              `Site admins will be able to hide or delete it.`
+                            : `Make ${l.name} official?\n\nIt will show on the map by default for every visitor, alongside the political map. ` +
+                              `It moves out of the community layers list, and can't be hidden or deleted until it's made a community layer again.`
+                        )) await api(`layers/${l.id}/official`, { official: !l.official })
+                    }), 'link'),
                     !l.official && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
                     !l.official && button('Delete', act(async () => {
                         if (confirm(`Delete ${l.name}, and every change request to it, for good?`)) await api(`layers/${l.id}`, undefined, 'DELETE')
