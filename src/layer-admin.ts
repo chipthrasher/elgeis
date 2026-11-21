@@ -226,11 +226,8 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
                     button('Settings', () => settings(l.id), 'link'),
                     !l.hidden && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
                         if (confirm(l.official
-                            ? `Make ${l.name} a community layer?\n\nIt will stop showing on the map by default, so most visitors won't see it ` +
-                              `unless they turn it on in the community layers list. Shared links that name it in ?layers= still show it. ` +
-                              `Site admins will be able to hide or delete it.`
-                            : `Make ${l.name} official?\n\nIt will show on the map by default for every visitor, alongside the political map. ` +
-                              `It moves out of the community layers list, and can't be hidden or deleted until it's made a community layer again.`
+                            ? `Are you sure you want to make ${l.name} a community layer?\n\nIt will stop showing on the map by default. This is a potentially destructive action.`
+                            : `Are you sure you want to make ${l.name} official?\n\nIt will show on the map by default. This is a potentially destructive action.`
                         )) await api(`layers/${l.id}/official`, { official: !l.official })
                     }), 'link'),
                     !l.official && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
