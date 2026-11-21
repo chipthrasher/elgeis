@@ -44,7 +44,8 @@ const PAUSED = ['nether']
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
-    createAccount(document.querySelector('#account')!, async user => {
+    let openCommunity = () => {}
+    createAccount(document.querySelector('#account')!, () => [linkButton('Community layers', () => openCommunity())], async user => {
         const editor = await ready
         // Reviewers get a link to what's waiting for them.
         const waiting = await api<unknown[]>('requests?review')
@@ -75,8 +76,7 @@ async function main() {
             editor.settings(l.layer.id)
         },
     })
-    // Controls in the bottom corners stack upwards, so the button sits beneath the layers control.
-    community.button.addTo(map)
+    openCommunity = community.open
     control.addTo(map)
     map.on('overlayadd overlayremove', () => save(map, toggles))
 

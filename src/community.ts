@@ -6,7 +6,7 @@
 import L from 'leaflet'
 import { DIMENSIONS, type Layer } from '../shared/layer.ts'
 import { api } from './api.ts'
-import { attempt, button, el, errorBox } from './dom.ts'
+import { attempt, el, errorBox } from './dom.ts'
 import type { MapLayer } from './layers.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
@@ -76,13 +76,5 @@ export function createCommunity({ map, control, layers, show, created }: Options
         )
     }
 
-    // A button beneath the layers control that opens the list.
-    const Button = L.Control.extend({
-        onAdd: () => {
-            const b = button('Community layers', open, 'community-button')
-            L.DomEvent.disableClickPropagation(b)
-            return el('div', { class: 'leaflet-control-layers leaflet-control' }, b)
-        },
-    })
-    return { open, button: new Button({ position: 'bottomleft' }) }
+    return { open }
 }

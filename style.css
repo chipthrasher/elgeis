@@ -231,9 +231,15 @@ a {
 
 .account .links {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   justify-content: center;
   margin-top: 0.25rem;
+}
+
+/* Links wrap onto a new row whole, rather than breaking mid-label. */
+.account .links > * {
+  white-space: nowrap;
 }
 
 /* Editor panel, below the account box */
@@ -567,15 +573,6 @@ a {
 
 .panel .community .help {
   display: block;
-}
-
-.leaflet-control .community-button {
-  font: inherit;
-  color: var(--col-lightest);
-  background: none;
-  border: none;
-  padding: 6px 10px;
-  cursor: pointer;
 }
 
 .panel .resolve {

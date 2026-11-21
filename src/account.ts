@@ -61,12 +61,15 @@ function form(fields: HTMLInputElement[], label: string, onSubmit: (...values: s
 
 const links = (...children: Node[]) => el('div', { class: 'links' }, children)
 
-// `extraLinks` are shown once someone's signed in and has a username, e.g. to the editor.
-export async function createAccount(box: HTMLElement, extraLinks: (user: User) => Promise<Node[]>) {
+// `publicLinks` are shown to everyone, signed in or not; `extraLinks` once
+// someone's signed in and has a username, e.g. to the editor.
+export async function createAccount(box: HTMLElement, publicLinks: () => Node[], extraLinks: (user: User) => Promise<Node[]>) {
     let user: User | null
     try {
         user = await getUser()
     } catch {
+        // No backend: nobody can sign in, but the public links still work.
+        box.replaceChildren(links(...publicLinks()))
         return
     }
     const show = (...children: (Node | string)[]) => {
@@ -76,7 +79,7 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
     const back = () => linkButton('Back', () => signIn())
 
     function signedOut() {
-        show(linkButton('Sign in', () => signIn()), ' or ', linkButton('sign up', signUp), ' to suggest changes to the map')
+        show(linkButton('Sign in', () => signIn()), ' or ', linkButton('sign up', signUp), ' to suggest changes to the map', links(...publicLinks()))
     }
 
     function signIn(notice = '') {
@@ -137,7 +140,7 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
         show(...notice ? [notice, el('br')] : [],
             'Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ',
             linkButton('Account', settings), ' · ', linkButton('Sign out', signOut),
-            ...extra.length ? [links(...extra)] : [])
+            links(...publicLinks(), ...extra))
     }
 
     async function settings() {
