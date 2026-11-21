@@ -5,7 +5,8 @@
 // above the list. The dynmap image is always at the bottom.
 //
 // What's shown is kept in ?layers=, in the same order, top first, so views
-// can be shared. It's left out when the view is the default.
+// can be shared. It's left out when the view is the default. Which community
+// layers are listed, shown or not, is kept in this browser's local storage.
 
 import L from 'leaflet'
 import { el } from './dom.ts'
@@ -32,15 +33,18 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
     const fixed = toggles.filter(t => !t.stacks)
 
     // The listed layers that stack, top first: those in ?layers=, in its
-    // order, then any other official layers.
+    // order, then the community layers listed here before, then any other
+    // official layers.
     const param = getParam('layers')?.split(',')
-    let order = [...new Set([...(param ?? []).flatMap(id => byId(id)?.stacks ? [byId(id)!] : []), ...defaults])]
+    const stacking = (ids: string[]) => ids.flatMap(id => byId(id)?.stacks ? [byId(id)!] : [])
+    let order = [...new Set([...stacking(param ?? []), ...stacking(loadListed()), ...defaults])]
     for (const t of toggles) if (param ? param.includes(t.id) : t.byDefault) t.group.addTo(map)
 
     const listed = (t: Toggle) => order.includes(t) || fixed.includes(t)
     const shownIds = (view: Toggle[]) => view.filter(t => map.hasLayer(t.group)).map(t => t.id)
 
     function save() {
+        storeListed(order)
         const shown = shownIds([...order, ...fixed])
         const isDefault = shown.join() === [...defaults, ...fixed.filter(t => t.byDefault)].map(t => t.id).join()
         setParam('layers', isDefault ? null : shown.join(','))
@@ -136,6 +140,8 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
 
     render()
     restack()
+    // Layers in a shared link are listed here from now on.
+    storeListed(order)
     const Control = L.Control.extend({
         onAdd: () => {
             L.DomEvent.disableClickPropagation(container)
@@ -170,5 +176,26 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
                 render()
             }
         },
+    }
+}
+
+// The community layers listed in the layers control, top first. Storage can be
+// unavailable, like in a private window, and then nothing is remembered.
+const LISTED_KEY = 'listedLayers'
+
+function loadListed(): string[] {
+    try {
+        const ids: unknown = JSON.parse(localStorage.getItem(LISTED_KEY) ?? '[]')
+        return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+    } catch {
+        return []
+    }
+}
+
+function storeListed(order: Toggle[]) {
+    try {
+        localStorage.setItem(LISTED_KEY, JSON.stringify(order.filter(t => !t.byDefault).map(t => t.id)))
+    } catch {
+        // Not remembered.
     }
 }
