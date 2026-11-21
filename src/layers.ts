@@ -4,7 +4,8 @@
 
 import L from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
-import { DIMENSION_SCALE, type Layer, type LayerObject } from '../shared/layer.ts'
+import { DIMENSION_SCALE, type Layer, type LayerData, type LayerObject } from '../shared/layer.ts'
+import { api } from './api.ts'
 import { toLatLng } from './map.ts'
 
 export interface MapObject {
@@ -34,14 +35,28 @@ export async function loadLayers(): Promise<MapLayer[]> {
     const index: Layer[] = await fetchJson(BASE + 'index.json')
     return Promise.all(index.map(async layer => {
         const { features }: { features: LayerObject[] } = await fetchJson(`${BASE}${layer.id}.json`)
-        const group = L.layerGroup()
-        const objects = features.map(object => ({
-            object,
-            layer,
-            drawn: object.geometry ? draw(layer, object).addTo(group) : null,
-        }))
-        return { layer, objects, group }
+        return toMapLayer(layer, features)
     }))
+}
+
+// Layers waiting for approval aren't built, so their admins load them from the
+// backend instead, leaving out hidden objects as the build does.
+export async function loadPending(): Promise<MapLayer[]> {
+    const infos = await api<{ id: string, pending: boolean, canAdmin: boolean }[]>('layers').catch(() => [])
+    return Promise.all(infos.filter(i => i.pending && i.canAdmin).map(async i => {
+        const { layer, objects } = await api<LayerData>(`layers/${i.id}`)
+        return toMapLayer(layer, objects.filter(o => !o.properties.hidden))
+    }))
+}
+
+function toMapLayer(layer: Layer, features: LayerObject[]): MapLayer {
+    const group = L.layerGroup()
+    const objects = features.map(object => ({
+        object,
+        layer,
+        drawn: object.geometry ? draw(layer, object).addTo(group) : null,
+    }))
+    return { layer, objects, group }
 }
 
 // For polygons whose nation has no color yet.

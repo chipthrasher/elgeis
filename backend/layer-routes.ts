@@ -19,7 +19,7 @@ import { DIMENSIONS, Field, Layer, newId, type LayerObject } from '../shared/lay
 import type { Db } from './db.ts'
 import { fail, isLayerAdmin, isSiteAdmin, parseBody, signedIn, siteAdmin, type Env } from './http.ts'
 import type { LayersRepo } from './layers.ts'
-import { notifyAddress, sign, signed } from './notify.ts'
+import { notify, notifyAddress, sign, signed } from './notify.ts'
 import { authorOf, type Deps } from './requests.ts'
 
 // Layer names end up in commit messages, so they're one line.
@@ -136,10 +136,13 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
         }))
     })
 
-    // A layer with its hidden objects, for the editor.
+    // A layer with its hidden objects, for the editor. Layers left out of the
+    // map, like those waiting for approval, only for their admins.
     app.get('/layers/:id', async c => {
         const data = find(c.req.param('id'))
-        return c.json({ ...data, canReview: await isLayerAdmin(db, c.get('user'), data.layer.id) })
+        const canReview = await isLayerAdmin(db, c.get('user'), data.layer.id)
+        if (repo.hidden.has(data.layer.id) && !canReview) throw fail(404, 'No such layer')
+        return c.json({ ...data, canReview })
     })
 
     /* Creating */
@@ -220,11 +223,17 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
 
     // Approving puts a pending layer in the community layer list. Rejecting
     // hides it, which can be undone. Returns false if it wasn't pending.
+    // Its creator hears when it's approved.
     const decide = (layerId: string, decision: Decision) => serially(async () => {
         const row = await db.updateTable('layer').set({ pending: false, ...decision === 'reject' && { hidden: true } })
-            .where('id', '=', layerId).where('pending', '=', true).returning('id').executeTakeFirst()
-        if (row) await hideLayers(db, repo)
-        return !!row
+            .where('id', '=', layerId).where('pending', '=', true).returning('createdBy').executeTakeFirst()
+        if (!row) return false
+        await hideLayers(db, repo)
+        const name = find(layerId).layer.name
+        if (decision === 'approve' && row.createdBy) {
+            await notify(db, [row.createdBy], `${name} is approved`, `Your layer "${name}" is approved, so it's in the community layer list for everyone now: ${siteUrl}/\n`)
+        }
+        return true
     })
 
     app.post('/layers/:id/pending', async c => {
@@ -235,20 +244,26 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
     })
 
     // The links in the email to the site's own address, which work without
-    // signing in. Each only approves, or only rejects, its one layer.
+    // signing in. Each only approves, or only rejects, its one layer. Opening
+    // one only asks to confirm, so a mail scanner following links can't.
     for (const decision of ['approve', 'reject'] as const) {
-        app.get(`/layers/:id/${decision}`, async c => {
-            const page = (status: 200 | 403 | 404, message: string) =>
-                c.html(html`<!doctype html><meta name="viewport" content="width=device-width"><title>Elgeis Map</title><p>${message}</p><p><a href="/">Back to the map</a></p>`, status)
+        const verb = decision === 'approve' ? 'Approve' : 'Reject'
+        app.on(['GET', 'POST'], `/layers/:id/${decision}`, async c => {
+            const page = (status: 200 | 403 | 404, ...body: unknown[]) =>
+                c.html(html`<!doctype html><meta name="viewport" content="width=device-width"><title>Elgeis Map</title>${body}<p><a href="/">Back to the map</a></p>`, status)
             const layerId = c.req.param('id')
-            if (!signed(secret, decisionMessage(layerId, decision), c.req.query('token') ?? '')) return page(403, "That link doesn't work.")
+            const token = c.req.query('token') ?? ''
+            if (!signed(secret, decisionMessage(layerId, decision), token)) return page(403, html`<p>That link doesn't work.</p>`)
             const layer = repo.data.find(l => l.layer.id === layerId)?.layer
-            const row = await db.selectFrom('layer').select('hidden').where('id', '=', layerId).executeTakeFirst()
-            if (!layer || !row) return page(404, 'That layer has been deleted.')
-            if (await decide(layerId, decision)) {
-                return page(200, decision === 'approve' ? `Approved ${layer.name}. It's in the community layer list now.` : `Rejected ${layer.name}. It's hidden.`)
+            const row = await db.selectFrom('layer').select(['hidden', 'pending']).where('id', '=', layerId).executeTakeFirst()
+            if (!layer || !row) return page(404, html`<p>That layer has been deleted.</p>`)
+            const already = () => page(200, html`<p>${layer.name} isn't waiting for approval: it was already ${row.hidden ? 'rejected or hidden' : 'approved'}.</p>`)
+            if (c.req.method === 'GET') {
+                if (!row.pending) return already()
+                return page(200, html`<p>${verb} ${layer.name}?</p><form method="post"><button>${verb} it</button></form>`)
             }
-            return page(200, `${layer.name} isn't waiting for approval: it was already ${row.hidden ? 'rejected or hidden' : 'approved'}.`)
+            if (!await decide(layerId, decision)) return already()
+            return page(200, html`<p>${decision === 'approve' ? `Approved ${layer.name}. It's in the community layer list now.` : `Rejected ${layer.name}. It's hidden.`}</p>`)
         })
     }
 
