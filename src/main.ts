@@ -23,12 +23,14 @@ async function main() {
     let openNewLayer = () => {}
     createAccount(document.querySelector('#account')!, () => [linkButton('New layer', () => openNewLayer())], async user => {
         const editor = await ready
-        // Reviewers get a link to what's waiting for them.
-        const waiting = await api<unknown[]>('requests?review')
+        // Reviewers, who are site admins and layer admins, get a link to
+        // what's waiting for them, even when nothing is.
+        const [waiting, layerInfos] = await Promise.all([api<unknown[]>('requests?review'), api<{ canAdmin: boolean }[]>('layers')])
+        const reviews = user.role === 'admin' || layerInfos.some(l => l.canAdmin)
         return [
             linkButton('Edit', () => editor.home()),
             linkButton('Your changes', () => editor.myRequests()),
-            (waiting.length > 0 || user.role === 'admin') && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
+            reviews && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
             user.role === 'admin' && linkButton('Moderate', () => editor.moderate()),
         ].filter((n): n is HTMLButtonElement => !!n)
     })
