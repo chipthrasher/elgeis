@@ -613,7 +613,21 @@ dialog.browse .browse-row {
   gap: 0.5rem;
   padding: 0.4rem 0.2rem;
   border-bottom: 0.1rem solid var(--col-dark);
+}
+
+dialog.browse .browse-row label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
   cursor: pointer;
+}
+
+dialog.browse .gear {
+  text-decoration: none;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 dialog.browse .browse-row[hidden] {

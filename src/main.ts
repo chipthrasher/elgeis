@@ -46,6 +46,7 @@ async function main() {
         map, layers,
         control: () => control,
         show: (...args) => editor.show(...args),
+        settings: layerId => editor.settings(layerId),
         // Someone made a new layer: carry on to its settings.
         created: l => {
             addPanes(map, [l.layer.id])

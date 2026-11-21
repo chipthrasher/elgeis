@@ -21,9 +21,11 @@ interface Options {
     show: Show
     // Called with a layer made here, before it's shown.
     created: (mapLayer: MapLayer) => void
+    // Opens a layer's settings, for its admins.
+    settings: (layerId: string) => void
 }
 
-export function createCommunity({ map, control, layers, show, created }: Options) {
+export function createCommunity({ map, control, layers, show, created, settings }: Options) {
     // The form for making a layer.
     function openNew() {
         const name = el('input', { required: true, placeholder: 'Name' })
@@ -54,26 +56,34 @@ export function createCommunity({ map, control, layers, show, created }: Options
     }
 
     // "See more" in the layers control: a window listing every community
-    // layer, to search and turn on or off, with its admins and description.
+    // layer, to search and turn on or off, with its admins and description,
+    // and a gear to open the settings of those you're an admin of.
     async function browse() {
+        const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Community layers' })
+        const close = () => dialog.close()
         // Who runs each layer, from the backend. Left out if it can't be reached.
         const infos = await api<LayerInfo[]>('layers').catch(() => [])
-        const adminsOf = (layerId: string) => infos.find(i => i.id === layerId)?.admins ?? []
+        const infoOf = (layerId: string) => infos.find(i => i.id === layerId)
         const list = layers.filter(l => !l.layer.official)
             .sort((a, b) => a.layer.name.localeCompare(b.layer.name))
             .map(l => {
-                const admins = adminsOf(l.layer.id)
+                const admins = infoOf(l.layer.id)?.admins ?? []
                 const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
                 box.addEventListener('change', () => control().setShown(l.layer.id, box.checked))
-                const node = el('label', { class: 'browse-row' }, [
-                    box,
-                    el('span', { class: 'browse-text' }, [
-                        el('span', { class: 'browse-head' }, [
-                            el('span', { class: 'browse-name' }, l.layer.name),
-                            admins.length > 0 && el('span', { class: 'admins' }, `${admins.length === 1 ? 'Admin' : 'Admins'}: ${admins.join(', ')}`),
+                const gear = infoOf(l.layer.id)?.canAdmin && el('button', { type: 'button', class: 'link gear', title: 'Layer settings', 'aria-label': `Settings for ${l.layer.name}` }, '⚙')
+                if (gear) gear.addEventListener('click', () => { close(); settings(l.layer.id) })
+                const node = el('div', { class: 'browse-row' }, [
+                    el('label', {}, [
+                        box,
+                        el('span', { class: 'browse-text' }, [
+                            el('span', { class: 'browse-head' }, [
+                                el('span', { class: 'browse-name' }, l.layer.name),
+                                admins.length > 0 && el('span', { class: 'admins' }, `${admins.length === 1 ? 'Admin' : 'Admins'}: ${admins.join(', ')}`),
+                            ]),
+                            l.layer.description && el('small', {}, l.layer.description),
                         ]),
-                        l.layer.description && el('small', {}, l.layer.description),
                     ]),
+                    gear,
                 ])
                 return { node, text: [l.layer.name, l.layer.description, ...admins].join('\n').toLowerCase() }
             })
@@ -87,8 +97,6 @@ export function createCommunity({ map, control, layers, show, created }: Options
         }
         search.addEventListener('input', filter)
 
-        const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Community layers' })
-        const close = () => dialog.close()
         dialog.append(
             el('div', { class: 'panel-head' }, [el('h2', {}, 'Community layers'), button('×', close, 'link close')]),
             el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to add them to the map.'),
