@@ -522,21 +522,13 @@ a {
   white-space: pre-line;
 }
 
-/* Changes drawn on the map: what's there now in red, what it'd become in green */
+/* Your draft's changes, drawn over the map while you edit */
 
-.diff-old,
 .diff-new,
 .diff-warning,
 .editing,
 .connector {
   stroke-width: 3px;
-}
-
-.diff-old {
-  stroke: var(--col-pastel-red);
-  fill: var(--col-pastel-red);
-  fill-opacity: 0.15;
-  stroke-dasharray: 6 4;
 }
 
 .diff-new {

@@ -16,8 +16,9 @@ interface Label {
     room: number
 }
 
+// Returns a function that stops refitting them; they're removed with their objects.
 export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObject) => string) {
-    map.createPane('labels').style.zIndex = '450' // above polygons and lines, below points
+    if (!map.getPane('labels')) map.createPane('labels').style.zIndex = '450' // above polygons and lines, below points
     const labels: Label[] = []
 
     for (const o of objects) {
@@ -64,4 +65,5 @@ export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObje
     }
     map.on('zoomend overlayadd overlayremove', fit)
     fit()
+    return () => { map.off('zoomend overlayadd overlayremove', fit) }
 }
