@@ -785,9 +785,11 @@ path.editing {
   width: 2.2rem;
 }
 
+/* A rounded bar, as all swatches used to be. */
 .swatch-area {
-  height: 1.9rem;
-  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  align-self: stretch;
+  margin: 7px 0;
+  border-radius: 100px;
 }
 
 .swatch-line {
