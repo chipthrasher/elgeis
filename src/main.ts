@@ -1,38 +1,17 @@
 // Entry point
 
-import L from 'leaflet'
 import { createAccount, linkButton } from './account.ts'
 import { api } from './api.ts'
+import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
+import { createLayerControl, type Toggle } from './layer-control.ts'
+import { emailSettings } from './notifications.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
-import { addPanes, colorPolygons, loadLayers } from './layers.ts'
+import { addPanes, colorPolygons, loadLayers, loadPending, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
-
-// Everything the layers control can show or hide: each map layer, plus the
-// dynmap image beneath them.
-interface Toggle {
-    id: string
-    name: string
-    group: L.Layer
-    // Shown when there's no ?layers= param.
-    byDefault: boolean
-}
-
-// What's being viewed is kept in ?layers=, so views can be shared.
-function showInitial(map: L.Map, toggles: Toggle[]) {
-    const param = getParam('layers')
-    const ids = param?.split(',')
-    for (const t of toggles) if (ids ? ids.includes(t.id) : t.byDefault) t.group.addTo(map)
-}
-
-function save(map: L.Map, toggles: Toggle[]) {
-    const shown = toggles.filter(t => map.hasLayer(t.group))
-    const isDefault = toggles.every(t => shown.includes(t) === t.byDefault)
-    setParam('layers', isDefault ? null : shown.map(t => t.id).join(','))
-}
 
 // Layers that are loaded (so references to them resolve) but can't be shown.
 // TODO: bring the Nether highway back.
@@ -41,29 +20,46 @@ const PAUSED = ['nether']
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
-    createAccount(document.querySelector('#account')!, async user => {
+    let openNewLayer = () => {}
+    createAccount(document.querySelector('#account')!, () => [linkButton('New layer', () => openNewLayer())], async user => {
         const editor = await ready
-        // Reviewers get a link to what's waiting for them.
-        const waiting = await api<unknown[]>('requests?review')
+        // Reviewers, who are site admins and layer admins, get a link to
+        // what's waiting for them, even when nothing is.
+        const [waiting, layerInfos] = await Promise.all([api<unknown[]>('requests?review'), api<{ canAdmin: boolean }[]>('layers')])
+        const reviews = user.role === 'admin' || layerInfos.some(l => l.canAdmin)
         return [
-            linkButton('Update the map', () => editor.home()),
+            linkButton('Edit', () => editor.home()),
             linkButton('Your changes', () => editor.myRequests()),
-            (waiting.length > 0 || user.role === 'admin') && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
+            reviews && linkButton(`Review${waiting.length ? ` (${waiting.length})` : ''}`, () => editor.reviewQueue()),
+            user.role === 'admin' && linkButton('Moderate', () => editor.moderate()),
         ].filter((n): n is HTMLButtonElement => !!n)
     })
-    const allLayers = await loadLayers()
+    // Plus, for their admins, layers waiting for approval, to keep working on.
+    const [built, pending] = await Promise.all([loadLayers(), loadPending()])
+    const allLayers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const { map, dynmap } = createMap()
-    addPanes(map)
+    addPanes(map, allLayers.map(l => l.layer.id))
 
-    const toggles: Toggle[] = [
-        ...layers.map(l => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official })),
-        { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true },
-    ]
-    showInitial(map, toggles)
-    const overlays = Object.fromEntries(toggles.map(t => [t.name, t.group]))
-    L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' }).addTo(map)
-    map.on('overlayadd overlayremove', () => save(map, toggles))
+    // Everything that can be shown or hidden: each map layer, plus the dynmap
+    // image beneath them. Official layers are listed in the layers control by
+    // default, top first in the order they come in; community layers once
+    // they're turned on under its "See more".
+    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
+    const community = createCommunity({
+        layers,
+        control: () => control,
+        show: (...args) => editor.show(...args),
+        settings: layerId => editor.settings(layerId),
+        // Someone made a new layer: carry on to its settings.
+        created: (l, pending) => {
+            addPanes(map, [l.layer.id])
+            control.add(toggleOf(l))
+            editor.settings(l.layer.id, pending ? "Made. A site admin will look at it before it's listed for everyone; until then, only its admins see it." : '')
+        },
+    })
+    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap Scrape', group: dynmap, byDefault: true, stacks: false }], community.browse)
+    openNewLayer = community.openNew
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
@@ -71,6 +67,17 @@ async function main() {
     const editor = createEditor(map, layers, index)
     resolveEditor!(editor)
     createSidebar(map, layers, index, editor.pick)
+
+    // Links in notification emails open a change request.
+    const request = Number(getParam('request'))
+    setParam('request', null)
+    if (request) editor.openRequest(request).catch(e => editor.show('Change request', (e as Error).message))
+    // And the setting for them, from the link at their foot, or the mail
+    // client's Unsubscribe. The token stays out of the address bar, so it
+    // isn't shared by accident.
+    const token = getParam('notifications')
+    setParam('notifications', null)
+    if (token) emailSettings(token).then(node => editor.show('Email notifications', node), e => editor.show('Email notifications', (e as Error).message))
 }
 
 main()

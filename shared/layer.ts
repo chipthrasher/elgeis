@@ -46,6 +46,8 @@ export type Icon = typeof ICONS[number]
 export const FIELD_TYPES = ['text', 'url', 'color', 'flag', 'reference', 'entities'] as const
 export type FieldType = typeof FIELD_TYPES[number]
 
+const Color = z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"')
+
 const fieldKey = z.string().regex(/^[a-z][a-zA-Z0-9]*$/, 'Expected a camelCase field key')
 
 export const Field = z.object({
@@ -74,6 +76,12 @@ export const Layer = z.object({
     titleField: fieldKey,
     // A shorter name drawn on the map instead of the title, when set.
     labelField: fieldKey.optional(),
+    // Whether hovering or clicking a line shows its hover card and finds it,
+    // like a point. Off, lines let the mouse through to what's beneath.
+    hoverLines: z.boolean().optional(),
+    // The color of areas with none of their own, and none from the entities
+    // they list. Without it, they're grey.
+    defaultColor: Color.optional(),
     fields: z.array(Field),
 }).strict().superRefine((layer, ctx) => {
     const keys = layer.fields.map(f => f.key)
@@ -133,7 +141,7 @@ export function idPrefixFor(geometry: Geometry | null): IdPrefix {
 const FIELD_VALUES: Record<FieldType, z.ZodType> = {
     text: z.string().min(1),
     url: z.url({ protocol: /^https?$/ }),
-    color: z.string().regex(/^#([0-9a-f]{3}){1,2}$/i, 'Expected a color like "#ff3f3f"'),
+    color: Color,
     flag: z.boolean(),
     reference: z.union([ObjectId, z.array(ObjectId).min(1)]),
     entities: z.array(z.string().regex(/^ent_[0-9a-z]+$/, 'Expected an entity ID like "ent_8f3k2a9x"')).min(1),

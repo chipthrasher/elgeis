@@ -11,8 +11,9 @@ import {
     type Field, type Geometry, type Layer, type LayerObject, type Position, type PropertyValue,
 } from '../shared/layer.ts'
 import { api, type ChangeRequest, type FullLayer } from './api.ts'
-import { el } from './dom.ts'
+import { attempt, button, el, errorBox } from './dom.ts'
 import { editShape, type ShapeEditor, type ShapeKind } from './draw.ts'
+import { layerAdmin } from './layer-admin.ts'
 import type { MapLayer, MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 import type { ObjectIndex } from './objects.ts'
@@ -29,12 +30,6 @@ interface Draft {
 const STATUS_TEXT: Record<string, string> = {
     draft: 'Draft', submitted: 'Waiting for review', stale: 'Needs updating',
     approved: 'Approved', rejected: 'Rejected', withdrawn: 'Withdrawn',
-}
-
-const button = (text: string, onClick: () => void, cls = '') => {
-    const b = el('button', { type: 'button', class: cls }, text)
-    b.addEventListener('click', onClick)
-    return b
 }
 
 export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex) {
@@ -76,6 +71,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         panel.classList.remove('hidden')
     }
 
+    const { settings, moderate } = layerAdmin(show, load)
+
     function close() {
         cleanup?.()
         cleanup = null
@@ -83,17 +80,6 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         undrawDraft = null
         picking = null
         panel.classList.add('hidden')
-    }
-
-    const errorBox = () => el('div', { class: 'error' })
-    // Run an action, showing what went wrong in the box if it fails.
-    async function attempt(box: HTMLElement, action: () => Promise<void>) {
-        box.textContent = ''
-        try {
-            await action()
-        } catch (e) {
-            box.textContent = (e as Error).message
-        }
     }
 
     /* Saving drafts */
@@ -174,7 +160,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         search.addEventListener('input', list)
 
         const current = await draftFor(layerId)
-        show('Update the map',
+        show('Edit',
             el('label', {}, ['Layer ', select]),
             el('p', { class: 'muted' }, 'Click something on the map, or find it here, to change it. Hidden things are listed too.'),
             search, results,
@@ -187,6 +173,10 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             current && current.ops.length > 0 && el('p', {}, [
                 `Your change request has ${current.ops.length} change${current.ops.length === 1 ? '' : 's'}. `,
                 button('Review and submit it', draftView, 'link'),
+            ]),
+            data.canReview && el('p', {}, [
+                "You're an admin of this layer. ",
+                button('Layer settings', () => settings(layerId), 'link'),
             ]),
         )
         picking = layerId
@@ -341,9 +331,20 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             return { type: 'Feature', id: start.id || newId(idPrefixFor(g)), geometry: g, properties }
         }
 
+        // Something new needs a title (its Name, or whatever the layer calls it),
+        // so it can be listed and found. Existing things are left as they are.
+        const titleField = layer.fields.find(f => f.key === layer.titleField)!
+        const titleNode = inputs.find(i => i.field === titleField)?.node
+        const titleInput = titleNode?.querySelector('input')
+        if (!original) titleNode?.querySelector('span')?.append(' (required)')
+
         async function submit() {
             await attempt(error, async () => {
                 const object = read()
+                if (!original && !object.properties[titleField.key]) {
+                    titleInput?.focus()
+                    throw new Error(`Give it a ${titleField.label.toLowerCase()} first`)
+                }
                 if (shapeKind && !object.geometry) throw new Error('Draw its shape first')
                 const ops: Op[] = [original
                     ? { op: 'update', baseVersion: objectVersion(original), object }
@@ -473,7 +474,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         show('Your change requests',
             el('p', { class: 'muted' }, `${open} of ${MAX_OPEN_REQUESTS} open.`),
             requestList(mine, "You haven't suggested any changes yet."),
-            button('Update the map', () => home(), 'primary'),
+            button('Edit', () => home(), 'primary'),
         )
     }
 
@@ -622,7 +623,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         return true
     }
 
-    return { home, myRequests, reviewQueue, pick }
+    return { home, myRequests, reviewQueue, openRequest, pick, show, settings, moderate }
 }
 
 function shapeKindOf(geometry: Geometry | null): ShapeKind | null {

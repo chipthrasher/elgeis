@@ -231,9 +231,15 @@ a {
 
 .account .links {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   justify-content: center;
   margin-top: 0.25rem;
+}
+
+/* Links wrap onto a new row whole, rather than breaking mid-label. */
+.account .links > * {
+  white-space: nowrap;
 }
 
 /* Editor panel, below the account box */
@@ -530,6 +536,132 @@ a {
   white-space: pre-line;
 }
 
+.panel .notice {
+  color: var(--col-pastel-green);
+}
+
+.panel h3 {
+  font-size: 1rem;
+  color: var(--col-lightest);
+  margin: 1.25rem 0 0.25rem;
+}
+
+/* Boxed blocks: each field in a layer's settings, and each layer in Moderate */
+
+.panel .schema-field,
+.panel .moderated > .change {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border: 0.1rem solid var(--col-dark);
+  border-radius: 0.4rem;
+}
+
+.panel .schema-field > input,
+.panel .schema-field .row > input {
+  width: 100%;
+  flex: 1;
+}
+
+.panel .schema-field .row {
+  margin: 0.3rem 0;
+}
+
+.panel form.row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "See more" in the layers control, which opens the community layers window */
+.layer-control .see-more {
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--col-light);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The community layers window: a dialog styled like the editor panel */
+dialog.browse {
+  width: min(32rem, calc(100vw - 2rem));
+  border: none;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.browse:not([open]) {
+  display: none;
+}
+
+dialog.browse::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+dialog.browse .browse-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0.5rem 0;
+}
+
+dialog.browse .browse-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 0.1rem solid var(--col-dark);
+}
+
+dialog.browse .browse-row label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+dialog.browse .gear {
+  text-decoration: none;
+  font-size: 2rem;
+  align-self: center;
+  line-height: 1;
+}
+
+dialog.browse .browse-row[hidden] {
+  display: none;
+}
+
+dialog.browse .browse-text {
+  flex: 1;
+  min-width: 0;
+}
+
+dialog.browse .browse-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+dialog.browse .browse-name {
+  color: var(--col-lightest);
+}
+
+dialog.browse .admins {
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--col-light);
+}
+
+dialog.browse small {
+  display: block;
+  color: var(--col-light);
+}
+
 .panel .resolve {
   margin: 0.75rem 0;
   padding: 0.25rem 0.75rem;
@@ -639,9 +771,36 @@ path.editing {
 }
 
 .itemright {
+  flex: 0 0 auto;
   width: 15%;
+  min-width: 2.2rem;
+  margin: 3px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The same width for every shape, so they line up. */
+.swatch {
+  width: 2.2rem;
+}
+
+/* A rounded bar, as all swatches used to be. */
+.swatch-area {
+  align-self: stretch;
+  margin: 7px 0;
   border-radius: 100px;
-  margin: 10px;
+}
+
+.swatch-line {
+  height: 0.8rem;
+}
+
+.swatch-point {
+  width: 1.5rem;
+  height: 1.75rem;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 28C10 24.5 0 19 0 12a12 12 0 0 1 24 0c0 7-10 12.5-12 16z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 28C10 24.5 0 19 0 12a12 12 0 0 1 24 0c0 7-10 12.5-12 16z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .itemcontent {
@@ -890,6 +1049,42 @@ path.editing {
   color-scheme: dark;
 }
 
+/* Our layers control: each layer with a handle to drag it up or down */
+.layer-control {
+  cursor: default;
+  user-select: none;
+}
+
+.layer-control .layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.layer-control .layer-row.dragging {
+  background: var(--col-dark);
+}
+
+.layer-control label {
+  cursor: pointer;
+}
+
+.layer-control .handle {
+  width: 1rem;
+  padding: 0;
+  font: inherit;
+  color: var(--col-light);
+  background: none;
+  border: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layer-control .dragging .handle {
+  cursor: grabbing;
+}
+
 /* Zoom buttons */
 .leaflet-container .leaflet-bar a {
   background: var(--col-darker);
@@ -916,3 +1111,13 @@ path.editing {
 }
 
 .leaflet-control-coordinates strong {}
+
+/* The accounts window, in Moderate: the community layers window's look */
+dialog.browse .banned {
+  font-size: 0.8rem;
+  color: var(--col-pastel-red);
+}
+
+dialog.browse .browse-row > button {
+  align-self: center;
+}

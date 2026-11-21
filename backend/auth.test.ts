@@ -128,3 +128,14 @@ test('change your username, email, and password', { skip }, async () => {
     assert.equal((await again('/api/auth/change-password', { currentPassword: 'first password', newPassword: 'second password' })).status, 200)
     assert.equal((await browser()('/api/auth/sign-in/email', { email: 'sam@new.example', password: 'second password' })).status, 200)
 })
+
+test("usernames can't pass for staff or hold slurs", { skip }, async () => {
+    const { signIn } = await testApp()
+    const request = await signIn('steve@example.com')
+    for (const username of ['admin', 'Mod', 'el_geis', 'Support.', 'xXretardXx']) {
+        assert.equal((await request('/api/auth/update-user', { username })).status, 400, username) // eslint-disable-line no-await-in-loop
+    }
+    assert.equal((await request('/api/auth/update-user', { username: 'steve', displayUsername: 'ADMIN' })).status, 400)
+    assert.equal((await request('/api/auth/update-user', { username: 'modest_admin' })).status, 200)
+    assert.equal((await request('/api/auth/sign-up/email', { username: 'root', email: 'r@example.com', password: 'password123', name: 'root' })).status, 400)
+})

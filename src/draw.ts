@@ -1,6 +1,8 @@
 // Drawing and editing one object's shape on the map, with Leaflet-Geoman:
 // points, lines, and polygons with holes and several parts. New vertices snap
 // to the vertices of what's already drawn, so neighboring borders line up.
+// While drawing a line or area, Backspace or Ctrl+Z (Cmd+Z) takes back the
+// last corner.
 
 import L from 'leaflet'
 import type { LineString, MultiLineString, MultiPolygon, Polygon as GeoPolygon } from 'geojson'
@@ -45,14 +47,41 @@ export function editShape(map: L.Map, kind: ShapeKind, initial: Geometry | null,
         onChange()
     }
 
+    // Stops Backspace and Ctrl+Z from taking back corners.
+    let stopUndo = () => {}
+
     function draw(drawKind: ShapeKind, done: (layer: L.Layer) => void) {
-        map.pm.enableDraw(drawKind === 'Point' ? 'Marker' : drawKind === 'LineString' ? 'Line' : 'Polygon', {
+        const shapeName = drawKind === 'Point' ? 'Marker' : drawKind === 'LineString' ? 'Line' : 'Polygon'
+        const start = () => map.pm.enableDraw(shapeName, {
             ...SNAPPING,
             continueDrawing: false,
             pathOptions: STYLE,
             markerStyle: { icon: pointIcon },
         })
-        map.once('pm:create', e => done(e.layer))
+        start()
+
+        // Take back the last corner. Geoman cancels the drawing when it takes
+        // back the only one, so start afresh instead.
+        const undo = (e: KeyboardEvent) => {
+            const key = e.key === 'Backspace' || ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z')
+            const typing = (e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable]')
+            const handler = (map.pm.Draw as unknown as Record<string, { enabled(): boolean, _markers?: unknown[], _removeLastVertex?(): void }>)[shapeName]
+            if (!key || typing || !handler?.enabled() || !handler._markers?.length) return
+            e.preventDefault()
+            if (handler._markers.length > 1) {
+                handler._removeLastVertex!()
+            } else {
+                map.pm.disableDraw()
+                start()
+            }
+        }
+        stopUndo()
+        document.addEventListener('keydown', undo)
+        stopUndo = () => document.removeEventListener('keydown', undo)
+        map.once('pm:create', e => {
+            stopUndo()
+            done(e.layer)
+        })
     }
 
     const pointIcon = L.divIcon({ className: 'point editing', iconSize: [12, 12] })
@@ -123,6 +152,7 @@ export function editShape(map: L.Map, kind: ShapeKind, initial: Geometry | null,
         },
 
         stop() {
+            stopUndo()
             map.pm.disableDraw()
             map.off('pm:create')
             if (shape) {

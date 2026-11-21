@@ -18,8 +18,8 @@ const recolor = (color: string): Op => ({
 async function setup() {
     const t = await testApp()
     const steve = await t.signIn('steve@example.com', 'steve')
-    const admin = await t.signIn('admin@example.com', 'admin')
-    await t.db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'admin').execute()
+    const admin = await t.signIn('admin@example.com', 'boss')
+    await t.db.updateTable('user').set({ role: 'admin' }).where('username', '=', 'boss').execute()
     return { ...t, steve, admin }
 }
 
@@ -55,13 +55,13 @@ test('draft, edit, submit, and approve a change request', { skip }, async () => 
 
     request = await json(await admin(`/api/requests/${request.id}/approve`, { comment: 'Thanks!' }))
     assert.equal(request.status, 'approved')
-    assert.equal(request.reviewedBy, 'admin')
-    assert.deepEqual(request.comments.map((c: { author: string, body: string }) => [c.author, c.body]), [['admin', 'Thanks!']])
+    assert.equal(request.reviewedBy, 'boss')
+    assert.deepEqual(request.comments.map((c: { author: string, body: string }) => [c.author, c.body]), [['boss', 'Thanks!']])
     assert.match(request.commit, /^[0-9a-f]{40}$/)
 
     // It's committed with steve as author, built, and pushed.
     assert.equal(git(dir, 'log', '-1', '--format=%an <%ae>').trim(), 'steve <steve@users.noreply.map.test>')
-    assert.match(git(dir, 'log', '-1', '--format=%B'), /^Recolor Adfelis\n\nApproved by admin\.\n\nChange-Request: \d+\nApproved-By: admin/)
+    assert.match(git(dir, 'log', '-1', '--format=%B'), /^Recolor Adfelis\n\nApproved by boss\.\n\nChange-Request: \d+\nApproved-By: boss/)
     assert.equal(git(remote, 'rev-parse', 'HEAD').trim(), request.commit)
     assert.match(fs.readFileSync(path.join(build, 'political.json'), 'utf8'), /#00ff00/)
     assert.equal(git(dir, 'show', 'HEAD:political/ent_a.json'), formatJson((recolor('#00ff00') as { object: LayerObject }).object))
@@ -156,7 +156,7 @@ test('on startup, requests committed but not marked approved are marked', { skip
         layers: [{ layer: repo.data[0].layer, objects: [op.object, POLYGON] }],
         changed: new Map([['political', ['ent_a']]]),
         author: { name: 'steve', email: 'steve@example.com' },
-        message: `Rename\n\nChange-Request: ${r.id}\nApproved-By: admin\n`,
+        message: `Rename\n\nChange-Request: ${r.id}\nApproved-By: boss\n`,
     })
     await reconcile()
     const request = await db.selectFrom('changeRequest').selectAll().where('id', '=', r.id).executeTakeFirstOrThrow()

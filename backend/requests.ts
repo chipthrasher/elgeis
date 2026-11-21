@@ -4,25 +4,18 @@
 // MAX_OPEN_REQUESTS open at once. A layer's admins, and site admins, review
 // them. Approvals run one at a time: each applies its ops to the layers repo,
 // commits, rebuilds the static JSON, marks the request approved, and pushes.
+// Reviewers hear about submitted requests by email, and authors about their
+// requests being approved, rejected, or going stale.
 
 import { Hono, type Context } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { checkOps, MAX_OPEN_REQUESTS, OPEN_STATUSES, opId, RequestBody, type Op, type Status } from '../shared/changes.ts'
-import { USERNAME_CHARS, type Auth } from './auth.ts'
+import { USERNAME_CHARS } from './auth.ts'
 import type { Db } from './db.ts'
-import type { LayersRepo } from './layers.ts'
+import { fail, isLayerAdmin, parseBody, signedIn, type Env, type Serially, type User } from './http.ts'
+import type { Author, LayersRepo } from './layers.ts'
+import { notify } from './notify.ts'
 import type { LayerObject } from '../shared/layer.ts'
-
-export interface User {
-    id: string
-    username: string
-    role: string | null
-}
-
-type Env = { Variables: { user: User | null } }
-
-const fail = (status: 400 | 401 | 403 | 404 | 409, message: string) => new HTTPException(status, { message })
 
 // The ID of the request a commit was made for, and who approved it, are kept
 // as trailers at the end of its message.
@@ -34,33 +27,29 @@ const safeName = (name: string | null) => name && USERNAME_CHARS.test(name) ? na
 const trailer = (message: string, key: string) =>
     message.trim().split('\n').reverse().find(line => line.startsWith(key + ': '))?.slice(key.length + 2)
 
-export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: string) {
+export interface Deps {
+    db: Db
+    repo: LayersRepo
+    siteUrl: string
+    serially: Serially
+    // For signing links in emails.
+    secret: string
+    // The site's own address, which hears about layers waiting for approval.
+    mailFrom?: string
+}
+
+// A commit author for a user. The repo is public, so authors get a stand-in
+// address rather than their real one.
+export async function authorOf(db: Db, siteUrl: string, userId: string): Promise<Author> {
+    const user = await db.selectFrom('user').select(['username', 'displayUsername']).where('id', '=', userId).executeTakeFirstOrThrow()
+    return { name: safeName(user.displayUsername) ?? user.username!, email: `${user.username}@users.noreply.${new URL(siteUrl).hostname}` }
+}
+
+export function requestRoutes({ db, repo, siteUrl, serially }: Deps) {
     const app = new Hono<Env>()
-
-    app.use(async (c, next) => {
-        const session = await auth.api.getSession({ headers: c.req.raw.headers })
-        const u = session?.user as { id: string, username?: string | null, role?: string | null, banned?: boolean | null } | undefined
-        c.set('user', u?.username && !u.banned ? { id: u.id, username: u.username, role: u.role ?? null } : null)
-        await next()
-    })
-
-    const signedIn = (c: Context<Env>) => {
-        const user = c.get('user')
-        if (!user) throw fail(401, 'Sign in and pick a username first')
-        return user
-    }
-
-    async function canReview(user: User | null, layerId: string) {
-        if (!user) return false
-        if (user.role === 'admin') return true
-        return !!await db.selectFrom('layerAdmin').select('userId').where('layerId', '=', layerId).where('userId', '=', user.id).executeTakeFirst()
-    }
-
-    const parseBody = async <T>(c: Context, schema: z.ZodType<T>): Promise<T> => {
-        const result = schema.safeParse(await c.req.json().catch(() => null))
-        if (!result.success) throw fail(400, z.prettifyError(result.error))
-        return result.data
-    }
+    const canReview = (user: User | null, layerId: string) => isLayerAdmin(db, user, layerId)
+    const link = (id: number) => `${siteUrl}/?request=${id}`
+    const layerName = (layerId: string) => repo.data.find(l => l.layer.id === layerId)?.layer.name ?? layerId
 
     // Throw if the ops aren't valid against the layers as they are now.
     function check(layerId: string, ops: Op[]) {
@@ -140,13 +129,19 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         if (body?.trim()) await db.insertInto('comment').values({ changeRequestId: id, authorId, body: body.trim() }).execute()
     }
 
-    /* Layers, with hidden objects, for the editor */
+    // Tell a request's author what happened to it.
+    async function tellAuthor(r: Request, subject: string, text: string) {
+        await notify(db, [r.authorId], subject, `${text}\n\n${link(r.id)}\n`)
+    }
 
-    app.get('/layers/:id', async c => {
-        const data = repo.data.find(l => l.layer.id === c.req.param('id'))
-        if (!data) throw fail(404, 'No such layer')
-        return c.json({ ...data, canReview: await canReview(c.get('user'), data.layer.id) })
-    })
+    // Tell a layer's admins there's a request to review, or the site admins
+    // if it has none.
+    async function askReviewers(r: Request, author: string) {
+        const admins = await db.selectFrom('layerAdmin').select('userId').where('layerId', '=', r.layerId).execute()
+        const reviewers = admins.length ? admins : await db.selectFrom('user').select('id as userId').where('role', '=', 'admin').execute()
+        await notify(db, reviewers.map(a => a.userId).filter(id => id !== r.authorId), `Review "${r.title}" on the Elgeis Map`,
+            `${author} asks you to review their change request "${r.title}" to ${layerName(r.layerId)}:\n\n${link(r.id)}\n`)
+    }
 
     /* Listing and reading */
 
@@ -212,6 +207,7 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         check(request.layerId, request.ops)
         if (!request.title) throw fail(400, 'Give your change request a title first')
         await setStatus(request.id, 'submitted', { submittedAt: new Date() })
+        await askReviewers(request, user.username)
         return c.json(await present(await load(request.id), user, true))
     })
 
@@ -239,6 +235,8 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         const { comment } = await parseBody(c, Review)
         await addComment(request.id, user.id, comment)
         await setStatus(request.id, 'rejected', { reviewedBy: user.id, reviewedAt: new Date() })
+        await tellAuthor(request, `Your change "${request.title}" wasn't approved`,
+            `${user.username} didn't approve your change request "${request.title}" to ${layerName(request.layerId)}.` + (comment?.trim() ? `\n\nThey said: ${comment.trim()}` : ''))
         return c.json(await present(await load(request.id), user, true))
     })
 
@@ -248,45 +246,29 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
             const { user, request } = await reviewable(c)
             await approve(request, user)
             await addComment(request.id, user.id, comment)
+            await tellAuthor(request, `Your change "${request.title}" is on the map`,
+                `${user.username} approved your change request "${request.title}" to ${layerName(request.layerId)}.` + (comment?.trim() ? `\n\nThey said: ${comment.trim()}` : ''))
             return user
         })
         return c.json(await present(await load(Number(c.req.param('id'))), user, true))
     })
 
-    // Approvals (and startup's reconciling) run one at a time, so two can't
-    // touch the repo at once.
-    let queue: Promise<unknown> = Promise.resolve()
-    function serially<T>(fn: () => Promise<T>): Promise<T> {
-        const run = queue.then(fn)
-        queue = run.catch(() => {})
-        return run
-    }
-
     // Git first, then Postgres. If the backend dies between the two,
     // reconcile() finishes the job on the next start.
     async function approve(request: Request, reviewer: User) {
         const { ops } = request
-        // Start from the remote's latest, so this doesn't undo or fork from
-        // edits made there.
-        try {
-            if (repo.sync()) await markStale()
-        } catch (e) {
-            throw fail(409, (e as Error).message)
-        }
+        await catchUp()
         const result = checkOps(repo.data, request.layerId, ops)
         if (result.stale.length) {
-            await setStatus(request.id, 'stale')
+            await markStale([request])
             throw fail(409, 'Something this change request changes has changed since, so it needs updating by its author')
         }
         if (result.errors.length) throw fail(400, result.errors.join('\n'))
 
-        const author = await db.selectFrom('user').select(['username', 'displayUsername']).where('id', '=', request.authorId).executeTakeFirstOrThrow()
         const commit = repo.commit({
             layers: result.layers,
             changed: new Map([[request.layerId, ops.map(opId)]]),
-            // The repo is public, so authors get a stand-in address rather
-            // than their real one.
-            author: { name: safeName(author.displayUsername) ?? author.username!, email: `${author.username}@users.noreply.${new URL(siteUrl).hostname}` },
+            author: await authorOf(db, siteUrl, request.authorId),
             message: `${request.title.replace(/\s+/g, ' ').trim() || 'Change request'}\n\nApproved by ${reviewer.username}.\n\nChange-Request: ${request.id}\nApproved-By: ${reviewer.username}\n`,
         })
         await setStatus(request.id, 'approved', { reviewedBy: reviewer.id, reviewedAt: new Date(), commit })
@@ -294,12 +276,34 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         repo.push()
     }
 
-    // Mark open requests stale when what they change has changed since.
-    async function markStale() {
-        const open = await db.selectFrom('changeRequest').select(['id', 'layerId', 'ops'])
-            .where('status', 'in', ['draft', 'submitted']).execute()
-        const stale = open.filter(r => checkOps(repo.data, r.layerId, r.ops).stale.length).map(r => r.id)
-        if (stale.length) await db.updateTable('changeRequest').set({ status: 'stale', updatedAt: new Date() }).where('id', 'in', stale).execute()
+    // Mark open requests stale when what they change has changed since (or
+    // these, which have), and tell their authors.
+    async function markStale(requests?: Request[]) {
+        const open = requests ?? await db.selectFrom('changeRequest').selectAll().where('status', 'in', ['draft', 'submitted']).execute()
+        const stale = open.filter(r => checkOps(repo.data, r.layerId, r.ops).stale.length)
+        if (!stale.length) return
+        await db.updateTable('changeRequest').set({ status: 'stale', updatedAt: new Date() }).where('id', 'in', stale.map(r => r.id)).execute()
+        for (const r of stale) {
+            await tellAuthor(r, `Your change "${r.title || 'Untitled'}" needs updating`, // eslint-disable-line no-await-in-loop
+                `Something your change request "${r.title || 'Untitled'}" changes on ${layerName(r.layerId)} has been changed since. ` +
+                `Open it to update it, keeping what you want from each.`)
+        }
+    }
+
+    // Pull in the remote's latest before committing, so a commit doesn't
+    // undo or fork from edits made there. Refuses if they can't be pulled in.
+    async function catchUp() {
+        try {
+            if (repo.sync()) await markStale()
+        } catch (e) {
+            throw fail(409, (e as Error).message)
+        }
+        await addLayerRows()
+    }
+
+    // Every layer in the repo gets a row, for its admins and change requests.
+    async function addLayerRows() {
+        if (repo.data.length) await db.insertInto('layer').values(repo.data.map(l => ({ id: l.layer.id }))).onConflict(c => c.doNothing()).execute()
     }
 
     // Catch up with the repo: pull in edits made to the remote, and mark
@@ -313,6 +317,7 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
             } catch (e) {
                 console.error((e as Error).message)
             }
+            await addLayerRows()
             for (const { hash, message } of repo.recentCommits(50)) {
                 const id = trailer(message, 'Change-Request')
                 if (!id || !/^\d+$/.test(id)) continue
@@ -332,5 +337,5 @@ export function requestRoutes(db: Db, auth: Auth, repo: LayersRepo, siteUrl: str
         })
     }
 
-    return { app, reconcile }
+    return { app, reconcile, markStale, catchUp }
 }
