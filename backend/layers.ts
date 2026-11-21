@@ -10,8 +10,9 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { objectVersion } from '../shared/changes.ts'
 import { formatJson } from '../shared/format.ts'
-import type { LayerData } from '../shared/layer.ts'
+import type { LayerData, LayerObject } from '../shared/layer.ts'
 import { buildLayers } from '../scripts/build-layers.ts'
 
 const git = (dir: string, ...args: string[]) =>
@@ -110,6 +111,22 @@ export class LayersRepo {
         } catch (e) {
             console.error('Pushing the layers repo failed:', (e as { stderr?: string }).stderr || (e as Error).message)
         }
+    }
+
+    // An object as it was at a version (see objectVersion), from the repo's
+    // history, or null if no commit has it.
+    findVersion(layerId: string, id: string, version: string): LayerObject | null {
+        const file = `${layerId}/${id}.json`
+        for (const hash of git(this.dir, 'log', '--format=%H', '--', file).split('\n').filter(Boolean)) {
+            let object: LayerObject
+            try {
+                object = JSON.parse(git(this.dir, 'show', `${hash}:${file}`))
+            } catch {
+                continue // deleted in this commit
+            }
+            if (objectVersion(object) === version) return object
+        }
+        return null
     }
 
     // The messages of the last `count` commits, newest first.

@@ -184,3 +184,29 @@ test("approving pulls in the remote's edits first, so it doesn't overwrite them"
     await reconcile()
     assert.equal(git(remote, 'log', '-1', '--format=%s').trim(), 'By hand')
 })
+
+test('a request made stale by another stays in review, with what it was made from', { skip }, async () => {
+    const { steve, admin } = await setup()
+    const make = async (title: string, color: string) => {
+        const r = await (await steve('/api/requests', { layerId: 'political', title, ops: [recolor(color)] })).json()
+        await steve(`/api/requests/${r.id}/submit`, {})
+        return r.id as number
+    }
+    const first = await make('Green', '#00ff00')
+    const second = await make('Blue', '#0000ff')
+    assert.equal((await admin(`/api/requests/${first}/approve`, {})).status, 200)
+
+    const queue = await (await admin('/api/requests?review')).json()
+    assert.deepEqual(queue.map((r: { id: number, status: string }) => [r.id, r.status]), [[second, 'stale']])
+    const stale = await (await steve(`/api/requests/${second}`)).json()
+    assert.deepEqual(stale.bases, { [NATION.id]: NATION })
+
+    // Updated to the latest and resubmitted, it can be approved.
+    const latest = { ...NATION, properties: { ...NATION.properties, color: '#00ff00' } }
+    const ops = [{ op: 'update', baseVersion: objectVersion(latest), object: { ...NATION, properties: { ...NATION.properties, color: '#0000ff' } } }]
+    assert.equal((await steve(`/api/requests/${second}`, { title: 'Blue', ops }, 'PUT')).status, 200)
+    assert.equal((await steve(`/api/requests/${second}/submit`, {})).status, 200)
+    const updated = await (await steve(`/api/requests/${second}`)).json()
+    assert.deepEqual(updated.bases, {})
+    assert.equal((await admin(`/api/requests/${second}/approve`, {})).status, 200)
+})

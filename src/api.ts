@@ -1,7 +1,7 @@
 // Calls to the backend's API. Errors come back as { message }.
 
 import type { Op, Status } from '../shared/changes.ts'
-import type { LayerData } from '../shared/layer.ts'
+import type { LayerData, LayerObject } from '../shared/layer.ts'
 
 export async function api<T>(path: string, body?: object, method = body ? 'POST' : 'GET'): Promise<T> {
     const response = await fetch('/api/' + path, {
@@ -24,8 +24,12 @@ export interface ChangeRequest {
     mine: boolean
     canReview: boolean
     updatedAt: string
+    submittedAt: string | null
     reviewedBy: string | null
     commit: string | null
+    // Objects that have changed since the request was made, as they were
+    // when it was (null if that version can't be found).
+    bases: Record<string, LayerObject | null>
     comments: { author: string | null, body: string, createdAt: string }[]
 }
 

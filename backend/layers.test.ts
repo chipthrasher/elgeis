@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { objectVersion } from '../shared/changes.ts'
 import { formatJson } from '../shared/format.ts'
 import { LayersRepo } from './layers.ts'
 import { git, NATION, POLYGON, testRepo } from './test-layers.ts'
@@ -121,4 +122,15 @@ test("sync carries on if the remote can't be reached", () => {
     const { dir, tmp, repo } = testRepo()
     git(dir, 'remote', 'set-url', 'origin', path.join(tmp, 'missing'))
     assert.equal(repo.sync(), false)
+})
+
+test('finds an object as it was at a version, from history', () => {
+    const { repo } = testRepo()
+    const original = repo.data[0].objects.find(o => o.id === 'ent_a')!
+    rename(repo, 'Emeraldia')
+    rename(repo, 'Goomlandia')
+    assert.deepEqual(repo.findVersion('political', 'ent_a', objectVersion(original)), original)
+    assert.equal(repo.findVersion('political', 'ent_a', objectVersion(named('Emeraldia') as never))!.properties.name, 'Emeraldia')
+    assert.equal(repo.findVersion('political', 'ent_a', 'nope'), null)
+    assert.equal(repo.findVersion('political', 'ent_zzz', 'nope'), null)
 })

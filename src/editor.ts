@@ -4,7 +4,7 @@
 
 import L from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
-import { MAX_OPEN_REQUESTS, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
+import { MAX_OPEN_REQUESTS, mergeChanges, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
 import { nearestOnLines } from '../shared/geometry.ts'
 import {
     DIMENSION_SCALE, idPrefixFor, newId,
@@ -17,7 +17,7 @@ import type { MapLayer, MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 import type { ObjectIndex } from './objects.ts'
 import { Names } from './names.ts'
-import { describeOp, showChanges, staleIds } from './review.ts'
+import { describeOp, showChanges, showValue, staleIds } from './review.ts'
 
 interface Draft {
     id?: number
@@ -506,7 +506,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             await api(`requests/${id}/${path}`, { comment: comment.value })
             then()
         })
-        const stale = request.mine && OPEN_STATUSES.includes(request.status) ? staleIds(data, request.ops) : []
+        const stale = OPEN_STATUSES.includes(request.status) && staleIds(data, request.ops).length > 0
 
         show(request.title || 'Untitled',
             el('p', { class: 'muted' }, [
@@ -514,14 +514,9 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 request.reviewedBy && ` · reviewed by ${request.reviewedBy}`,
             ]),
             changes,
-            stale.length > 0 && el('div', { class: 'warning' }, [
-                'Some of what this changes has changed since. ',
-                button('Update to the latest', () => attempt(error, async () => {
-                    await save(rebase(data, request))
-                    openRequest(id)
-                }), 'link'),
-                ' (your version replaces the newer one, so check it first)',
-            ]),
+            stale && request.mine && resolver(data, request, error),
+            stale && !request.mine && el('p', { class: 'warning' },
+                `Something this changes has been changed since, so it's waiting for ${request.author ?? 'its author'} to update it.`),
             el('div', { class: 'comments' }, request.comments.map(c => el('div', { class: 'comment' }, [el('strong', {}, c.author ?? 'someone'), ' ', c.body]))),
             (request.mine || request.canReview) && comment,
             error,
@@ -542,15 +537,80 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         cleanup = showChanges(map, layers, index, names, data, request, changes)
     }
 
-    // Point a stale request's changes at the latest versions, dropping
-    // changes to objects that are gone.
-    function rebase(data: FullLayer, request: ChangeRequest): Draft {
-        const ops = request.ops.flatMap((op): Op[] => {
-            if (op.op === 'add') return [op]
-            const current = data.objects.find(o => o.id === opId(op))
-            return current ? [{ ...op, baseVersion: objectVersion(current) }] : []
+    // For a request whose objects have changed since it was made: merges each
+    // with its newer version, asks which to keep where both changed the same
+    // field, and updates the request, resubmitting it if it was submitted.
+    function resolver(data: FullLayer, request: ChangeRequest, error: HTMLElement) {
+        const field = (key: string) => data.layer.fields.find(f => f.key === key)
+        const labelOf = (key: string) => key === 'geometry' ? 'Shape' : field(key)?.label ?? (key === 'hidden' ? 'Hidden' : key)
+        const stale = new Set(staleIds(data, request.ops))
+        // Each op, as it'll be once resolved.
+        const resolved: (() => Op[])[] = []
+
+        const items = request.ops.map(op => {
+            const id = opId(op)
+            if (!stale.has(id)) {
+                resolved.push(() => [op])
+                return null
+            }
+            const title = el('div', { class: `change-title ${op.op}` }, describeOp(names, data, op))
+            const current = data.objects.find(o => o.id === id)
+            if (!current) {
+                resolved.push(() => [])
+                return el('div', { class: 'change' }, [title, el('p', { class: 'muted' }, "It's been deleted since, so this change will be dropped.")])
+            }
+            if (op.op !== 'update') {
+                resolved.push(() => [{ ...op, baseVersion: objectVersion(current) } as Op])
+                return el('div', { class: 'change' }, [title, el('p', { class: 'muted' }, "It's been changed since. This still deletes it.")])
+            }
+
+            const base = request.bases[id] ?? null
+            const { merged, kept, conflicts } = mergeChanges(base, current, op.object)
+            const keepNewer = new Set<string>()
+            const choice = (key: string) => {
+                const option = (newer: boolean, text: string) => {
+                    const radio = el('input', { type: 'radio', name: `pick-${id}-${key}`, checked: !newer })
+                    radio.addEventListener('change', () => { if (newer) keepNewer.add(key); else keepNewer.delete(key) })
+                    return el('label', { class: 'check' }, [radio, ' ', text])
+                }
+                const value = (o: LayerObject) => showValue(names, field(key), o.properties[key])
+                return el('div', { class: 'conflict' }, [
+                    el('div', { class: 'conflict-field' }, labelOf(key)),
+                    option(true, key === 'geometry' ? 'The shape on the map now (Before)' : `Now: ${value(current)}`),
+                    option(false, key === 'geometry' ? 'Your shape (After)' : `Yours: ${value(op.object)}`),
+                ])
+            }
+            resolved.push(() => {
+                const object = structuredClone(merged)
+                for (const key of keepNewer) {
+                    if (key === 'geometry') object.geometry = current.geometry
+                    else if (current.properties[key] === undefined) delete object.properties[key]
+                    else object.properties[key] = current.properties[key]
+                }
+                return [{ op: 'update', baseVersion: objectVersion(current), object }]
+            })
+            return el('div', { class: 'change' }, [
+                title,
+                !base && el('p', { class: 'muted' }, "The version this was made from couldn't be found, so every difference is listed."),
+                kept.length > 0 && el('p', { class: 'muted' }, `Keeps the newer ${kept.map(labelOf).join(', ')}, which this didn't change.`),
+                conflicts.length > 0 && el('p', {}, 'Both changed these. Which should it keep?'),
+                ...conflicts.map(choice),
+            ])
         })
-        return { ...toDraft(request), ops }
+
+        const resubmit = !!request.submittedAt
+        return el('div', { class: 'resolve' }, [
+            el('p', { class: 'warning' }, 'Some of what this changes has been changed since, so it needs updating before it can be approved.'),
+            ...items.filter(i => i !== null),
+            el('div', { class: 'row' }, [button(resubmit ? 'Update and resubmit' : 'Update', () => attempt(error, async () => {
+                await save({ ...toDraft(request), ops: resolved.flatMap(r => r()) })
+                if (resubmit) {
+                    await api(`requests/${request.id}/submit`, {})
+                    draft = null
+                }
+                openRequest(request.id)
+            }), 'primary')]),
+        ])
     }
 
     // Clicking something on the map, while picking, opens it in the editor.

@@ -115,3 +115,40 @@ export function changedFields(layer: Layer, before: LayerObject, after: LayerObj
         .filter(k => JSON.stringify(before.properties[k]) !== JSON.stringify(after.properties[k]))
         .map(k => ({ key: k, label: label(k), before: before.properties[k], after: after.properties[k] }))
 }
+
+// A stale update merged with what's changed since it was made, field by field
+// (the shape counts as one field, `geometry`). A field changed on only one
+// side takes that side's value; one changed differently on both is a
+// conflict, which keeps yours until the author picks. Without the object as it
+// was when the request was made (`base`), every difference is a conflict.
+export interface Merge {
+    merged: LayerObject
+    // Fields where the newer value was kept, since the request didn't change them.
+    kept: string[]
+    // Fields both changed, differently.
+    conflicts: string[]
+}
+
+export function mergeChanges(base: LayerObject | null, theirs: LayerObject, mine: LayerObject): Merge {
+    const get = (o: LayerObject, key: string) => key === 'geometry' ? o.geometry : o.properties[key]
+    const same = (a: unknown, b: unknown) => formatJson(a ?? null) === formatJson(b ?? null)
+    const keys = new Set(['geometry', ...[base, theirs, mine].flatMap(o => o ? Object.keys(o.properties) : [])])
+    const merged: LayerObject = { ...mine, properties: {} }
+    const kept: string[] = []
+    const conflicts: string[] = []
+    for (const key of keys) {
+        const t = get(theirs, key), m = get(mine, key)
+        let value = m
+        if (!same(t, m)) {
+            if (base && same(get(base, key), m)) {
+                value = t
+                kept.push(key)
+            } else if (!base || !same(get(base, key), t)) {
+                conflicts.push(key)
+            }
+        }
+        if (key === 'geometry') merged.geometry = (value ?? null) as LayerObject['geometry']
+        else if (value !== undefined) merged.properties[key] = value as LayerObject['properties'][string]
+    }
+    return { merged, kept, conflicts }
+}
