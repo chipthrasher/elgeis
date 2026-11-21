@@ -33,6 +33,10 @@ export function createAuth(db: Db, { siteUrl, secret, sendMail }: AuthOptions) {
         secret,
         database: { db, type: 'postgres' },
         session: { expiresIn: 365 * DAY, updateAge: DAY },
+        // Limits how often each address can sign in, sign up, and send
+        // email, in production. Caddy passes on the client's address in
+        // X-Forwarded-For, having checked it against TRUSTED_PROXIES.
+        rateLimit: { storage: 'database' },
         emailAndPassword: {
             enabled: true,
             requireEmailVerification: true,

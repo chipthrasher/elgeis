@@ -62,6 +62,25 @@ export interface Database {
         body: string
         createdAt: Generated<Date>
     }
+    // Email notifications waiting to be sent (see notify.ts).
+    emailQueue: {
+        id: Generated<number>
+        userId: string
+        subject: string
+        text: string
+        createdAt: Generated<Date>
+        sentAt: Timestamp | null
+        attempts: Generated<number>
+        lastError: string | null
+    }
+    // Better Auth's rate limits, by client address and path, and ours (see
+    // rate-limit.ts). lastRequest is in milliseconds.
+    rateLimit: {
+        id: string
+        key: string
+        count: number
+        lastRequest: ColumnType<string, number, number>
+    }
     // Small bits of state that don't need a table of their own.
     appState: {
         key: string

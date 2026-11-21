@@ -9,6 +9,7 @@
 //   dist/layers/<id>.json       a FeatureCollection of the layer's visible objects
 //
 // Everything is validated first, and nothing is written if anything is invalid.
+// Layers a site admin has hidden are validated but not written.
 //
 // The backend runs this on the layers repo. To run it yourself:
 //   node scripts/build-layers.ts <layers dir> <output dir>
@@ -66,13 +67,14 @@ export function readLayers(dir: string): LayerData[] {
     return layers
 }
 
-export function buildLayers(layersDir: string, outDir: string): LayerData[] {
+export function buildLayers(layersDir: string, outDir: string, hidden = new Set<string>()): LayerData[] {
     const layers = readLayers(layersDir)
+    const shown = layers.filter(l => !hidden.has(l.layer.id))
     fs.rmSync(outDir, { recursive: true, force: true })
     fs.mkdirSync(outDir, { recursive: true })
 
-    fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(layers.map(l => l.layer)))
-    for (const { layer, objects } of layers) {
+    fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(shown.map(l => l.layer)))
+    for (const { layer, objects } of shown) {
         const features = objects.filter(o => !o.properties.hidden)
         fs.writeFileSync(path.join(outDir, layer.id + '.json'), JSON.stringify({ type: 'FeatureCollection', features }))
     }
