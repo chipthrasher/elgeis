@@ -55,6 +55,7 @@ Notifications are queued in Postgres and sent in the background every few second
 - **Review requests:** a submitted change request emails its layer's admins, or the site admins if the layer has none. The author never emails themselves.
 - **Approvals and rejections** email the author, with the reviewer's comment.
 - **Stale notices** email the author when something their open request changes has changed since.
+- **Anyone can turn them off,** in their account settings or from the link at the foot of each email. The same link is the email's `List-Unsubscribe` header, so a mail client's own Unsubscribe button opens the setting in the browser. The link carries a signed token, so it works without signing in. There's deliberately no `List-Unsubscribe-Post` (one-click) header, which would make Gmail unsubscribe silently instead of opening the setting; Gmail and Yahoo only require it of senders of 5,000+ emails a day.
 
 ## Rate limits
 

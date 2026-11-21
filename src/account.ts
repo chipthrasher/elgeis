@@ -6,6 +6,7 @@
 
 import { api } from './api.ts'
 import { el } from './dom.ts'
+import { emailSettings } from './notifications.ts'
 import { getParam, setParam } from './url.ts'
 
 export interface User {
@@ -142,6 +143,7 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
     async function settings() {
         if (!user) return
         const hasPassword = (await call('list-accounts').catch(() => [])).some((a: { providerId: string }) => a.providerId === 'credential')
+        const notifications = await emailSettings().catch(() => null)
         const heading = (text: string) => el('div', {}, el('strong', {}, text))
         show(
             heading('Username'),
@@ -166,6 +168,7 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
                     await call('request-password-reset', { email: user!.email, redirectTo: here() })
                     signedIn(`Check ${user!.email} for a link to set a password.`)
                 })),
+            ...notifications ? [heading('Notifications'), notifications] : [],
             links(linkButton('Done', () => signedIn())),
         )
     }
