@@ -19,7 +19,7 @@ export interface User {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const call = (path: string, body?: object) => api<any>('auth/' + path, body)
 
-const getUser = async (): Promise<User | null> => (await call('get-session'))?.user ?? null
+export const getUser = async (): Promise<User | null> => (await call('get-session'))?.user ?? null
 
 // Links in our emails bring people back to this view of the map.
 const here = () => location.pathname + location.search

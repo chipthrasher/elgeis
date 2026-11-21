@@ -1,9 +1,10 @@
 // Running layers. A layer's admins edit its name and schema (the fields its
 // objects have), and pick its other admins. Site admins also mark layers
-// official, hide or delete community layers, and ban accounts.
+// official, hide or delete community layers, ban accounts, and read the audit log.
 
 import { FIELD_TYPES, ICONS, type Field, type FieldType, type Layer } from '../shared/layer.ts'
 import { api, type FullLayer } from './api.ts'
+import { auditLog } from './audit.ts'
 import { attempt, button, el, errorBox } from './dom.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
@@ -254,6 +255,9 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
             el('h3', {}, 'Accounts'),
             el('p', { class: 'muted' }, "Banned accounts are signed out, can't sign in or suggest changes, and their community layers are hidden until they're unbanned."),
             el('div', { class: 'row' }, button('Accounts…', () => users(moderate))),
+            el('h3', {}, 'Audit log'),
+            el('p', { class: 'muted' }, 'Who signed up, signed in or failed to, and changed anything, for the past year.'),
+            el('div', { class: 'row' }, button('Audit log…', auditLog)),
         )
     }
 

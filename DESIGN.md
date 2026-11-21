@@ -49,6 +49,7 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 - **Site admins** are a small set of accounts with power over the whole site.
 - **Bans are site-wide.** A site admin can ban an account from submitting change requests to any layer.
 - **Site admins can hide or delete community layers.** Hiding is reversible: it's kept in Postgres, and the layer is left out of the static JSON, so it drops off the map and out of the community list. Deleting removes the layer's folder from the layers repo, and its change requests with it, and is refused while another layer still points at its objects.
+- **Site admins can read an audit log** of who did what: accounts made, sign-ins (failed ones too, with the email or username tried), account changes, and every change through the API, refused or not, with the time and client address. It's kept in Postgres for a year. It records routes and IDs, never request bodies, so no passwords.
 - **Site admins decide which layers are official** and shown by default. The political map and the Nether highway start out official. Official layers can't be hidden or deleted.
 
 ## Email notifications

@@ -25,6 +25,10 @@ export const currentUser = (auth: Auth): MiddlewareHandler<Env> => async (c, nex
     await next()
 }
 
+// The client's address. Caddy passes it on in X-Forwarded-For, having checked
+// it against TRUSTED_PROXIES, and the backend isn't reachable except through Caddy.
+export const clientIp = (headers: Headers | undefined) => headers?.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+
 export function signedIn(c: Context<Env>) {
     const user = c.get('user')
     if (!user) throw fail(401, 'Sign in and pick a username first')

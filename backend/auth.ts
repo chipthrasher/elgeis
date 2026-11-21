@@ -9,7 +9,9 @@
 // https://www.better-auth.com/docs for the endpoints.
 
 import { betterAuth } from 'better-auth'
+import { createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { admin, magicLink, username } from 'better-auth/plugins'
+import { audit } from './audit.ts'
 import type { Db } from './db.ts'
 
 const DAY = 60 * 60 * 24
@@ -34,6 +36,10 @@ export interface AuthOptions {
     secret: string
     sendMail: (to: string, subject: string, text: string) => Promise<void>
 }
+
+// What the audit log keeps of a request to Better Auth: who it was for, and
+// never passwords.
+const IDENTIFIERS = ['email', 'username', 'newEmail']
 
 const IGNORE = "If this wasn't you, you can ignore this email."
 
@@ -74,6 +80,31 @@ export function createAuth(db: Db, { siteUrl, secret, sendMail }: AuthOptions) {
             autoSignInAfterVerification: true,
         },
         user: { changeEmail: { enabled: true } },
+        // The audit log: every account made, and every request to Better Auth
+        // but signing out and GETs that don't sign anyone in (like reading the
+        // session). Failed sign-ins are logged with the email or username tried.
+        databaseHooks: {
+            user: { create: { after: (user, ctx) => audit(db, { user, headers: ctx?.request?.headers, action: 'create account', target: { email: user.email } }) } },
+        },
+        hooks: {
+            after: createAuthMiddleware(async ctx => {
+                const signedIn = ctx.context.newSession
+                if (!ctx.request || ctx.path === '/sign-out' || (ctx.request.method === 'GET' && !signedIn)) return
+                const user = (signedIn ?? ctx.context.session)?.user
+                const body: Record<string, unknown> = ctx.body ?? {}
+                const target: Record<string, string> = Object.fromEntries(IDENTIFIERS.flatMap(k => typeof body[k] === 'string' ? [[k, body[k].slice(0, 200)]] : []))
+                // So entries from someone without a username yet say who.
+                if (user && !user.username && !target.email) target.email = user.email
+                const returned = ctx.context.returned
+                await audit(db, {
+                    user,
+                    headers: ctx.request.headers,
+                    action: `${ctx.request.method} /auth${ctx.path}`,
+                    target,
+                    status: isAPIError(returned) ? returned.statusCode : 200,
+                })
+            }),
+        },
         plugins: [
             magicLink({
                 expiresIn: 15 * 60,

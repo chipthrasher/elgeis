@@ -7,6 +7,7 @@
 
 import L from 'leaflet'
 import { DIMENSIONS, type Layer } from '../shared/layer.ts'
+import { getUser } from './account.ts'
 import { api } from './api.ts'
 import { attempt, button, el, errorBox } from './dom.ts'
 import type { LayerInfo } from './layer-admin.ts'
@@ -59,12 +60,13 @@ export function createCommunity({ control, layers, show, created, settings }: Op
 
     // "See more" in the layers control: a window listing every community
     // layer, to search and add to or remove from the layers control, with its admins and description,
-    // and a gear to open the settings of those you're an admin of.
+    // and a gear to open the settings of those you're an admin of. Those signed
+    // in with a username can make a new one from here too.
     async function browse() {
         const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Community layers' })
         const close = () => dialog.close()
         // Who runs each layer, from the backend. Left out if it can't be reached.
-        const infos = await api<LayerInfo[]>('layers').catch(() => [])
+        const [infos, user] = await Promise.all([api<LayerInfo[]>('layers').catch(() => []), getUser().catch(() => null)])
         const infoOf = (layerId: string) => infos.find(i => i.id === layerId)
         // Plus layers waiting for approval that this viewer runs, which aren't
         // on the map to turn on.
@@ -109,7 +111,7 @@ export function createCommunity({ control, layers, show, created, settings }: Op
             el('p', { class: 'muted' }, 'Maps people have made of their own. Turn them on to add them to the map.'),
             search,
             el('div', { class: 'browse-list' }, [...list.map(l => l.node), none]),
-            el('div', { class: 'row' }, button('Make a new layer', () => { close(); openNew() }, 'link')),
+            user?.username ? el('div', { class: 'row' }, button('Make a new layer', () => { close(); openNew() }, 'link')) : '',
         )
         // Clicks outside the window land on the dialog itself, behind it.
         dialog.addEventListener('click', e => { if (e.target === dialog) close() })

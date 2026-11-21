@@ -95,6 +95,21 @@ export interface Database {
         count: number
         lastRequest: ColumnType<string, number, number>
     }
+    // Who did what, and when, for site admins (see audit.ts).
+    auditLog: {
+        id: Generated<number>
+        createdAt: Generated<Date>
+        // Who, if anyone was signed in, with their username at the time.
+        userId: string | null
+        username: string | null
+        ip: string
+        // What, like "POST /layers/:id/admins", or "create account".
+        action: string
+        // Which, like { "id": "lay_3k9x2m", "username": "bob" }.
+        target: Json<Record<string, string>>
+        // The HTTP status it ended with: 400 and up means it was refused.
+        status: number
+    }
     // Small bits of state that don't need a table of their own.
     appState: {
         key: string
