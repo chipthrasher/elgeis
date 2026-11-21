@@ -2,14 +2,14 @@
 
 ## Developing
 
-The site runs in Docker. To start it (the frontend, the backend, Postgres, and [Mailpit](http://localhost:8025) to catch email):
+The site runs in Docker, driven by [Task](https://taskfile.dev). To start it (the frontend, the backend, Postgres, and [Mailpit](http://localhost:8025) to catch email):
 
 ```sh
 cp .env.example .env
-docker compose -f compose.yaml -f compose.dev.yaml up --build
+task up
 ```
 
-With [Task](https://taskfile.dev) installed, `task up` starts it in the background, `task logs` follows the logs (`task logs -- backend` for one service), and `task down` stops it. Add `PROD=1` to any of them to use the production setup instead, e.g. `task up PROD=1` on the server.
+`task logs` follows the logs (`task logs -- backend` for one service), and `task down` stops it.
 
 The site is at http://localhost:8080. When you save a frontend file, it rebuilds and open pages reload; when you save a backend file, the backend restarts. After changing `package.json`, run the command again so the images are rebuilt.
 
@@ -38,11 +38,13 @@ Database tests are skipped unless `DATABASE_URL` points at a Postgres server whe
 
 ## Deploying
 
-The site runs with Docker Compose. Copy `.env.example` to `.env`, fill it in, and start it:
+On the server, copy `.env.example` to `.env`, fill it in (see below), and start it:
 
 ```sh
-docker compose up -d --build
+task up PROD=1
 ```
+
+To update it, `git pull` and run `task up PROD=1` again. `task logs PROD=1` and `task down PROD=1` work the same way.
 
 It serves plain HTTP on `HTTP_PORT`. To put it on the internet:
 
