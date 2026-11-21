@@ -29,10 +29,10 @@ jobs:
         DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
     - run: npm run build
 
-  # On main, once CI passes, tag a release if any commit since the last tag
-  # calls for one, going by Conventional Commits: a breaking change ("feat!:"
-  # or a "BREAKING CHANGE:" footer) bumps the major version, "feat" the minor,
-  # and "fix" or "perf" the patch. Anything else (docs, chore, ...) tags nothing.
+  # On main, once CI passes, tag a release for the commits since the last tag,
+  # going by Conventional Commits: a breaking change ("feat!:" or a "BREAKING
+  # CHANGE:" footer) bumps the major version, "feat" the minor, and anything
+  # else the patch.
   release:
     needs: lint
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -51,8 +51,8 @@ jobs:
         log=$(git log --format=%B ${last:+$last..}HEAD)
         if grep -qE '^[a-z]+(\([^)]*\))?!:|^BREAKING[ -]CHANGE:' <<<"$log"; then bump=major
         elif grep -qE '^feat(\([^)]*\))?:' <<<"$log"; then bump=minor
-        elif grep -qE '^(fix|perf)(\([^)]*\))?:' <<<"$log"; then bump=patch
-        else echo "Nothing to release since ${last:-the start}"; exit 0
+        elif [ -n "$log" ]; then bump=patch
+        else echo "Nothing new since $last"; exit 0
         fi
 
         # Keep whatever prefix the last tag had, "v" or none.
