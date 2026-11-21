@@ -540,9 +540,10 @@ a {
   margin: 1.25rem 0 0.25rem;
 }
 
-/* Layer settings: one block per field in the schema */
+/* Boxed blocks: each field in a layer's settings, and each layer in Moderate */
 
-.panel .schema-field {
+.panel .schema-field,
+.panel .moderated > .change {
   margin: 0.5rem 0;
   padding: 0.5rem;
   border: 0.1rem solid var(--col-dark);
