@@ -67,10 +67,11 @@ The backend is Node.js with TypeScript, using [Hono](https://hono.dev/) for rout
 
 Auth runs inside the backend using [Better Auth](https://www.better-auth.com/), which is MIT-licensed and stores its tables in our Postgres. There's no separate auth service.
 
-- **Users sign in with an email link.** Clicking the link verifies the email, so there are no passwords to store or reset. Mail goes out over SMTP.
+- **Users sign up with an email, a username, and a password.** They can't sign in until they click the link we email them, which confirms the email. Signing up with an email that already has an account looks like it worked, so nobody can find out who has one, and the owner gets an email about it. Mail goes out over SMTP.
+- **Users sign in with their email or username and password,** or with a one-time link emailed to them instead. "Forgot password?" emails a link to pick a new one, which also signs out everyone else; it's how people who've only used links set a password.
 - **Users pick any username.** It doesn't have to match their Minecraft player name.
-- **Sessions are cookies.** The backend gets the current user from Better Auth on each request.
-- **Email is the only way in, so sessions last a long time.** If SMTP breaks or sign-in links land in spam, people who are already signed in stay signed in. Passkeys (a Better Auth plugin) could be added later as a second way to sign in.
+- **Users can change their username, email, and password.** A new email takes effect once they click the link sent to it; changing the password needs the current one.
+- **Sessions are cookies.** The backend gets the current user from Better Auth on each request. They last a long time, so if SMTP breaks or emails land in spam, people who are already signed in stay signed in. Passkeys (a Better Auth plugin) could be added later as another way to sign in.
 - **Site admins and bans use Better Auth's admin plugin.** Layer admins live in our own table, because they're set per layer.
 
 ## Deployment
