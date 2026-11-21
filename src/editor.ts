@@ -3,6 +3,7 @@
 // each layer's schema, so nothing here knows about any particular layer.
 
 import L from 'leaflet'
+import type { GeoJsonObject } from 'geojson'
 import { MAX_OPEN_REQUESTS, objectVersion, OPEN_STATUSES, opId, type Op } from '../shared/changes.ts'
 import { nearestOnLines } from '../shared/geometry.ts'
 import {
@@ -50,6 +51,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     let drawing = false
     // Undoes what the current view put on the map.
     let cleanup: (() => void) | null = null
+    // Takes the draft's changes back off the map.
+    let undrawDraft: (() => void) | null = null
 
     const load = async (layerId: string, fresh = false) => {
         if (fresh || !cache.has(layerId)) {
@@ -63,6 +66,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     function show(title: string, ...children: (Node | string | null | false)[]) {
         cleanup?.()
         cleanup = null
+        undrawDraft?.()
+        undrawDraft = null
         picking = null
         panel.replaceChildren(
             el('div', { class: 'panel-head' }, [el('h2', {}, title), button('×', close, 'link close')]),
@@ -74,6 +79,8 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     function close() {
         cleanup?.()
         cleanup = null
+        undrawDraft?.()
+        undrawDraft = null
         picking = null
         panel.classList.add('hidden')
     }
@@ -108,7 +115,33 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         if (draft?.layerId === layerId) return draft
         const mine = await api<ChangeRequest[]>('requests?mine')
         const open = mine.find(r => r.layerId === layerId && (r.status === 'draft' || r.status === 'stale'))
-        return open ? toDraft(open) : { layerId, title: '', ops: [] }
+        if (open) draft = toDraft(open)
+        return open ? draft! : { layerId, title: '', ops: [] }
+    }
+
+    // Draw the draft's changes in place of what they change, so the map shows
+    // the layer as the request would leave it, and new shapes snap to it.
+    // Leaves out the object being edited, which its shape editor draws.
+    function drawDraft(except?: string) {
+        undrawDraft?.()
+        undrawDraft = null
+        const mapLayer = layers.find(l => l.layer.id === draft?.layerId)
+        if (!draft || !mapLayer) return
+        const { layerId } = draft
+        const ops = draft.ops.filter(op => opId(op) !== except)
+        const showDrawn = hideDrawn(ops.map(opId))
+        const scale = DIMENSION_SCALE[mapLayer.layer.dimension]
+        const group = L.featureGroup().addTo(map)
+        for (const op of ops) {
+            if (op.op === 'delete' || !op.object.geometry || op.object.properties.hidden) continue
+            const { id } = op.object
+            L.geoJSON(op.object as GeoJsonObject, {
+                coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
+                pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 6, snapIgnore: false } as L.CircleMarkerOptions),
+                style: { className: 'diff-new', snapIgnore: false } as L.PathOptions,
+            }).on('click', () => { if (!drawing && picking === layerId) form(layerId, id) }).addTo(group)
+        }
+        undrawDraft = () => { group.remove(); showDrawn() }
     }
 
     async function setOp(layerId: string, ops: Op[], remove: string[] = []) {
@@ -140,7 +173,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         }
         search.addEventListener('input', list)
 
-        const current = draft?.layerId === layerId ? draft : null
+        const current = await draftFor(layerId)
         show('Update the map',
             el('label', {}, ['Layer ', select]),
             el('p', { class: 'muted' }, 'Click something on the map, or find it here, to change it. Hidden things are listed too.'),
@@ -157,6 +190,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             ]),
         )
         picking = layerId
+        drawDraft()
         search.focus()
     }
 
@@ -261,6 +295,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         function editGeometry() {
             if (!shapeKind) return
             // Hide the object's own drawing while its shape is edited.
+            drawDraft(id ?? undefined)
             const showDrawn = hideDrawn(id ? [id] : [])
             const point = start.geometry?.type === 'GeometryCollection' ? start.geometry.geometries[0] : start.geometry
             shapeEditor = editShape(map, shapeKind, point, DIMENSION_SCALE[layer.dimension], () => {
@@ -335,6 +370,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 button('Cancel', () => home(layerId), 'link'),
             ]),
         )
+        drawDraft()
     }
 
     /* Nether portals: a suggested connector to the nearest highway line */
@@ -412,6 +448,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 }), 'link'),
             ]),
         )
+        drawDraft()
     }
 
     /* Requests: yours, those to review, and one at a time */
@@ -448,10 +485,11 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     function hideDrawn(ids: string[]) {
         const restore = ids.flatMap(id => {
             const o = index.get(id)
-            const group = o?.drawn && layers.find(l => l.layer === o.layer)?.group
-            if (!group) return []
-            group.removeLayer(o.drawn!)
-            return [() => group.addLayer(o.drawn!)]
+            const drawn = o?.drawn
+            const group = layers.find(l => l.layer === o?.layer)?.group
+            if (!drawn || !group?.hasLayer(drawn)) return []
+            group.removeLayer(drawn)
+            return [() => group.addLayer(drawn)]
         })
         return () => restore.forEach(f => f())
     }
