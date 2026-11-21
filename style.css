@@ -350,11 +350,10 @@ a {
 
 .panel .help {
   display: block;
-  margin: -0.15rem 0 0.3rem;
+  margin: -0.1rem 0 0.3rem;
   color: var(--col-light);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   line-height: 1.2;
-  font-style: italic;
 }
 
 .panel .check .help {
