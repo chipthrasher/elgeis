@@ -256,14 +256,12 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         let geometry = start.geometry
         let shapeEditor: ShapeEditor | null = null
         const shapeBox = el('div', { class: 'shape' })
-        const drawn = id ? index.get(id) : undefined
         const connector = portalConnector(data, start)
 
         function editGeometry() {
             if (!shapeKind) return
             // Hide the object's own drawing while its shape is edited.
-            const group = drawn?.drawn && layers.find(l => l.layer === drawn.layer)?.group
-            if (group) group.removeLayer(drawn.drawn!)
+            const showDrawn = hideDrawn(id ? [id] : [])
             const point = start.geometry?.type === 'GeometryCollection' ? start.geometry.geometries[0] : start.geometry
             shapeEditor = editShape(map, shapeKind, point, DIMENSION_SCALE[layer.dimension], () => {
                 geometry = shapeEditor?.geometry() ?? null
@@ -274,7 +272,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 drawing = false
                 shapeEditor?.stop()
                 connector?.stop()
-                if (group) group.addLayer(drawn.drawn!)
+                showDrawn()
             }
             const previous = cleanup
             cleanup = () => { stopShape(); previous?.() }
@@ -445,6 +443,19 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         show('Waiting for review', requestList(requests, 'Nothing to review right now.'))
     }
 
+    // Take objects' own drawings off the map. Returns a function that puts
+    // them back.
+    function hideDrawn(ids: string[]) {
+        const restore = ids.flatMap(id => {
+            const o = index.get(id)
+            const group = o?.drawn && layers.find(l => l.layer === o.layer)?.group
+            if (!group) return []
+            group.removeLayer(o.drawn!)
+            return [() => group.addLayer(o.drawn!)]
+        })
+        return () => restore.forEach(f => f())
+    }
+
     async function openRequest(id: number) {
         const request = await api<ChangeRequest>(`requests/${id}`)
         const data = await load(request.layerId, true)
@@ -488,7 +499,10 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 request.mine && OPEN_STATUSES.includes(request.status) && button('Withdraw', act('withdraw', myRequests), 'link'),
             ]),
         )
-        cleanup = showChanges(map, names, data, request, changes)
+        // Hide what's on the map now, so only the request's before and after show.
+        const showDrawn = hideDrawn(request.ops.map(opId))
+        const hideChanges = showChanges(map, names, data, request, changes)
+        cleanup = () => { hideChanges(); showDrawn() }
     }
 
     // Point a stale request's changes at the latest versions, dropping

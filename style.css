@@ -470,6 +470,34 @@ a {
   width: 30%;
 }
 
+.panel tr.heading th {
+  font-size: 0.8rem;
+}
+
+.panel .toggle {
+  display: inline-flex;
+  margin: 0.5rem 0;
+  border: 1px solid var(--col-light);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.panel .toggle button {
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--col-lighter);
+}
+
+.panel .toggle button + button {
+  border-left: 1px solid var(--col-light);
+}
+
+.panel .toggle button.on {
+  background: var(--col-dark);
+  color: var(--col-lightest);
+}
+
 .panel td.old {
   color: var(--col-pastel-red);
   text-decoration: line-through;

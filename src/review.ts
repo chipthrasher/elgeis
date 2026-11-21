@@ -1,5 +1,6 @@
 // Shows a change request: each change on the map (the old shape in red, the
-// new one in green) with its changed properties, warnings about borders that
+// new one in green, with a switch to see just before or just after) with its
+// changed properties, warnings about borders that
 // overlap or leave gaps, and comments. Reviewers approve or reject it here,
 // and authors follow it.
 
@@ -43,14 +44,16 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
     const { layer } = data
     const field = (key: string) => layer.fields.find(f => f.key === key)
     const scale = DIMENSION_SCALE[layer.dimension]
-    const group = L.featureGroup().addTo(map)
-    const draw = (object: LayerObject | undefined, className: string) => {
+    const oldGroup = L.featureGroup()
+    const newGroup = L.featureGroup()
+    const group = L.featureGroup([oldGroup, newGroup]).addTo(map)
+    const draw = (object: LayerObject | undefined, className: string, to: L.FeatureGroup) => {
         if (!object?.geometry) return
         L.geoJSON(object as GeoJsonObject, {
             coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
             pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 6 }),
             style: { className, interactive: false },
-        }).addTo(group)
+        }).addTo(to)
     }
 
     // The layer as it would be, for checking borders.
@@ -68,18 +71,21 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
     for (const op of request.ops) {
         const before = done ? undefined : data.objects.find(o => o.id === opId(op))
         const next = op.op === 'delete' ? undefined : op.object
-        draw(before, 'diff-old')
-        draw(next, 'diff-new')
+        draw(before, 'diff-old', oldGroup)
+        draw(next, 'diff-new', newGroup)
 
         const rows = op.op === 'delete' ? [] : changedFields(layer, before ?? { ...op.object, properties: {} }, op.object)
         const geometryChanged = JSON.stringify(before?.geometry ?? null) !== JSON.stringify(next?.geometry ?? null)
         const item = el('div', { class: 'change' }, [
             el('div', { class: `change-title ${op.op}` }, describeOp(names, data, op)),
-            rows.length > 0 && el('table', {}, rows.map(r => el('tr', {}, [
-                el('th', {}, r.label),
-                before && el('td', { class: 'old' }, show(names, field(r.key), r.before)),
-                el('td', { class: 'new' }, show(names, field(r.key), r.after)),
-            ]))),
+            rows.length > 0 && el('table', {}, [
+                before && el('tr', { class: 'heading' }, [el('th'), el('th', {}, 'Before'), el('th', {}, 'After')]),
+                ...rows.map(r => el('tr', {}, [
+                    el('th', {}, r.label),
+                    before && el('td', { class: 'old' }, show(names, field(r.key), r.before)),
+                    el('td', { class: 'new' }, show(names, field(r.key), r.after)),
+                ])),
+            ]),
             op.op !== 'delete' && geometryChanged && before && el('div', { class: 'muted' }, 'Shape changed'),
         ])
 
@@ -90,10 +96,28 @@ export function showChanges(map: L.Map, names: Names, data: FullLayer, request: 
                 const neighbor = after.get(w.with)
                 const name = (neighbor && names.describe(layer, neighbor)) || w.with
                 item.append(el('div', { class: 'warning' }, `${w.kind === 'overlap' ? 'Overlaps' : 'Leaves a gap with'} ${name} near ${w.at.map(Math.round).join(', ')}`))
-                L.circleMarker(toLatLng(w.at[0] * scale, w.at[1] * scale), { radius: 10, className: 'diff-warning', interactive: false }).addTo(group)
+                L.circleMarker(toLatLng(w.at[0] * scale, w.at[1] * scale), { radius: 10, className: 'diff-warning', interactive: false }).addTo(newGroup)
             }
         }
         list.append(item)
+    }
+
+    // Switch between the map before, after, or both at once.
+    if (oldGroup.getLayers().length) {
+        const views = { Before: [oldGroup], Both: [oldGroup, newGroup], After: [newGroup] }
+        const buttons = Object.entries(views).map(([label, shown]) => {
+            const b = el('button', { type: 'button' }, label)
+            b.addEventListener('click', () => {
+                for (const g of [oldGroup, newGroup]) {
+                    if (shown.includes(g)) group.addLayer(g)
+                    else group.removeLayer(g)
+                }
+                for (const other of buttons) other.classList.toggle('on', other === b)
+            })
+            return b
+        })
+        buttons[1].classList.add('on')
+        list.prepend(el('div', { class: 'toggle' }, buttons))
     }
 
     const bounds = group.getBounds()
