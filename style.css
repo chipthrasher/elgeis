@@ -949,6 +949,42 @@ path.editing {
   color-scheme: dark;
 }
 
+/* Our layers control: each layer with a handle to drag it up or down */
+.layer-control {
+  cursor: default;
+  user-select: none;
+}
+
+.layer-control .layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.layer-control .layer-row.dragging {
+  background: var(--col-dark);
+}
+
+.layer-control label {
+  cursor: pointer;
+}
+
+.layer-control .handle {
+  width: 1rem;
+  padding: 0;
+  font: inherit;
+  color: var(--col-light);
+  background: none;
+  border: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layer-control .dragging .handle {
+  cursor: grabbing;
+}
+
 /* Zoom buttons */
 .leaflet-container .leaflet-bar a {
   background: var(--col-darker);

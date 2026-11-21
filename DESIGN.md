@@ -28,6 +28,7 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 - **Layer admins run their layer.** They edit its name, description, and schema, and add or remove other admins (a layer always keeps at least one, unless a site admin removes it). Each schema edit is one commit to the layers repo. Removing a field removes its values from the layer's objects in the same commit; changing a field's type is refused if the objects' values don't fit it.
 - **Community layers are hidden by default.** The official layers (the political map and the Nether highway) show by default. To see a community layer, a viewer opens the list of community layers and enables it.
 - **The layers being viewed are stored in a URL param** (e.g. `?layers=political,nether,lay_3k9x2m`), so people can share custom views. This works alongside the existing `q` search param.
+- **Viewers choose which layers draw on top.** The layers control lists layers in the order they're stacked, top first, and they can be dragged (or moved with the arrow keys) into another order. `?layers=` lists them in that same order. Each layer is drawn in panes of its own, so a whole layer sits above or below another; within a layer, polygons are below lines, then names, then points. The dynmap image is always at the bottom.
 
 ## Change requests
 

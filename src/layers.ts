@@ -47,18 +47,41 @@ export async function loadLayers(): Promise<MapLayer[]> {
 // For polygons whose nation has no color yet.
 const NO_COLOR = '#888'
 
-// Polygons get their own pane so they always sit below lines and points, no
-// matter which layer is toggled on last.
-export function addPanes(map: L.Map) {
-    map.createPane('polygons').style.zIndex = '350'
+// Each layer is drawn in panes of its own, so the viewer can stack layers in
+// any order (see layer-control.ts). Within a layer, polygons sit at the
+// bottom, then lines, then polygons' names, then points.
+const PANES = ['polygons', 'lines', 'labels', 'points'] as const
+export const paneFor = (layerId: string, kind: typeof PANES[number]) => `${layerId}-${kind}`
+
+// Every layer's panes sit in one pane, above the dynmap image and below what
+// the editor draws, hover cards, and the like.
+export function addPanes(map: L.Map, layerIds: string[]) {
+    const parent = map.getPane('layers') ?? map.createPane('layers')
+    parent.style.zIndex = '350'
+    for (const id of layerIds) {
+        PANES.forEach((kind, i) => {
+            if (!map.getPane(paneFor(id, kind))) map.createPane(paneFor(id, kind), parent).style.zIndex = String(i)
+        })
+    }
+}
+
+// Stack the layers' panes in this order, bottom first.
+export function stackLayers(map: L.Map, bottomFirst: string[]) {
+    bottomFirst.forEach((id, rank) => PANES.forEach((kind, i) => {
+        const pane = map.getPane(paneFor(id, kind))
+        if (pane) pane.style.zIndex = String(rank * PANES.length + i)
+    }))
 }
 
 // Leaflet only draws paths within the renderer's bounds (the view plus
 // `padding` on each side, as a fraction of the view) and redraws when a drag
 // ends. With the default 0.1, dragging reveals a blank gap until then.
 const PADDING = 1
-const polygonRenderer = L.svg({ pane: 'polygons', padding: PADDING })
-const lineRenderer = L.svg({ padding: PADDING })
+const renderers = new Map<string, L.Renderer>()
+function rendererFor(pane: string) {
+    if (!renderers.has(pane)) renderers.set(pane, L.svg({ pane, padding: PADDING }))
+    return renderers.get(pane)!
+}
 
 export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     const scale = DIMENSION_SCALE[layer.dimension]
@@ -68,14 +91,15 @@ export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
         coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
         pointToLayer: (_, latlng) => L.marker(latlng, {
             icon: L.divIcon({ className: ring ? 'point ring' : 'point', iconSize: [10, 10] }),
+            pane: paneFor(layer.id, 'points'),
             // Shapes being drawn snap to these (see draw.ts).
             snapIgnore: false,
         }),
         style: feature => {
-            const polygon = /Polygon/.test(feature?.geometry.type ?? '')
-            return polygon
-                ? { className: 'polygon', pane: 'polygons', renderer: polygonRenderer, color: NO_COLOR, fillColor: NO_COLOR, snapIgnore: false }
-                : { className: 'line', renderer: lineRenderer, interactive: false, snapIgnore: false }
+            const polygons = paneFor(layer.id, 'polygons'), lines = paneFor(layer.id, 'lines')
+            return /Polygon/.test(feature?.geometry.type ?? '')
+                ? { className: 'polygon', pane: polygons, renderer: rendererFor(polygons), color: NO_COLOR, fillColor: NO_COLOR, snapIgnore: false }
+                : { className: 'line', pane: lines, renderer: rendererFor(lines), interactive: false, snapIgnore: false }
         },
         // Tag each element with its object's ID, e.g. `[data-id="pol_8f3k2a9x"]`.
         // Leaflet makes new elements whenever a layer is re-added, so tag on every add.

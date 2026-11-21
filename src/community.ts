@@ -1,6 +1,6 @@
 // Community layers: every layer that isn't official. They're hidden until a
-// viewer turns them on in this list, which adds them to the layers control
-// (and so to ?layers=). Anyone signed in can make a new one here, and becomes
+// viewer turns them on in this list, which adds them to the top of the layers
+// control (and so to ?layers=). Anyone signed in can make a new one here, and becomes
 // its admin.
 
 import L from 'leaflet'
@@ -8,33 +8,22 @@ import { DIMENSIONS, type Layer } from '../shared/layer.ts'
 import { api } from './api.ts'
 import { attempt, el, errorBox } from './dom.ts'
 import type { LayerInfo } from './layer-admin.ts'
+import type { LayerControl } from './layer-control.ts'
 import type { MapLayer } from './layers.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
 
 interface Options {
     map: L.Map
-    control: L.Control.Layers
+    control: LayerControl
     layers: MapLayer[]
     show: Show
-    // Called with a layer made here, once it's on the map.
+    // Called with a layer made here, before it's shown.
     created: (mapLayer: MapLayer) => void
 }
 
 export function createCommunity({ map, control, layers, show, created }: Options) {
     const community = () => layers.filter(l => !l.layer.official)
-
-    // Community layers are in the layers control while they're shown.
-    function setShown(l: MapLayer, on: boolean) {
-        if (on) {
-            control.addOverlay(l.group, l.layer.name)
-            l.group.addTo(map)
-        } else {
-            l.group.remove()
-            control.removeLayer(l.group)
-        }
-    }
-    for (const l of community()) if (map.hasLayer(l.group)) control.addOverlay(l.group, l.layer.name)
 
     async function open() {
         const name = el('input', { required: true, placeholder: 'Name' })
@@ -54,8 +43,8 @@ export function createCommunity({ map, control, layers, show, created }: Options
                 const layer = await api<Layer>('layers', { name: name.value, description: description.value, dimension: dimension.value })
                 const l: MapLayer = { layer, objects: [], group: L.layerGroup() }
                 layers.push(l)
-                setShown(l, true)
                 created(l)
+                control.setShown(layer.id, true)
             })
         })
 
@@ -68,7 +57,7 @@ export function createCommunity({ map, control, layers, show, created }: Options
             list.length === 0 && el('p', { class: 'muted' }, 'There are none yet.'),
             ...list.map(l => {
                 const box = el('input', { type: 'checkbox', checked: map.hasLayer(l.group) })
-                box.addEventListener('change', () => setShown(l, box.checked))
+                box.addEventListener('change', () => control.setShown(l.layer.id, box.checked))
                 const admins = adminsOf(l.layer.id)
                 return el('label', { class: 'check community' }, [
                     el('span', { class: 'community-head' }, [

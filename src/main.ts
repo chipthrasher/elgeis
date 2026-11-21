@@ -1,10 +1,10 @@
 // Entry point
 
-import L from 'leaflet'
 import { createAccount, linkButton } from './account.ts'
 import { api } from './api.ts'
 import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
+import { createLayerControl, type Toggle } from './layer-control.ts'
 import { emailSettings } from './notifications.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
@@ -12,30 +12,6 @@ import { addPanes, colorPolygons, loadLayers, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
-
-// Everything that can be shown or hidden: each map layer, plus the dynmap
-// image beneath them. Official layers and the dynmap are always in the layers
-// control; community layers are turned on in their own list.
-interface Toggle {
-    id: string
-    name: string
-    group: L.Layer
-    // Shown when there's no ?layers= param.
-    byDefault: boolean
-}
-
-// What's being viewed is kept in ?layers=, so views can be shared.
-function showInitial(map: L.Map, toggles: Toggle[]) {
-    const param = getParam('layers')
-    const ids = param?.split(',')
-    for (const t of toggles) if (ids ? ids.includes(t.id) : t.byDefault) t.group.addTo(map)
-}
-
-function save(map: L.Map, toggles: Toggle[]) {
-    const shown = toggles.filter(t => map.hasLayer(t.group))
-    const isDefault = toggles.every(t => shown.includes(t) === t.byDefault)
-    setParam('layers', isDefault ? null : shown.map(t => t.id).join(','))
-}
 
 // Layers that are loaded (so references to them resolve) but can't be shown.
 // TODO: bring the Nether highway back.
@@ -59,26 +35,25 @@ async function main() {
     const allLayers = await loadLayers()
     const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
     const { map, dynmap } = createMap()
-    addPanes(map)
+    addPanes(map, allLayers.map(l => l.layer.id))
 
-    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official })
-    const toggles: Toggle[] = [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true }]
-    showInitial(map, toggles)
-    const overlays = Object.fromEntries(toggles.filter(t => t.byDefault).map(t => [t.name, t.group]))
-    const control = L.control.layers(undefined, overlays, { collapsed: false, position: 'bottomleft' })
+    // Everything that can be shown or hidden: each map layer, plus the dynmap
+    // image beneath them. Official layers are listed in the layers control by
+    // default, top first in the order they come in; community layers once
+    // they're turned on in their own list.
+    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
+    const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap', group: dynmap, byDefault: true, stacks: false }])
     const community = createCommunity({
         map, layers, control,
         show: (...args) => editor.show(...args),
         // Someone made a new layer: carry on to its settings.
         created: l => {
-            toggles.push(toggleOf(l))
-            save(map, toggles)
+            addPanes(map, [l.layer.id])
+            control.add(toggleOf(l))
             editor.settings(l.layer.id)
         },
     })
     openCommunity = community.open
-    control.addTo(map)
-    map.on('overlayadd overlayremove', () => save(map, toggles))
 
     const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
