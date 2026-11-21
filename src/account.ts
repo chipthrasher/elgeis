@@ -1,12 +1,15 @@
-// Signing in and out, through the backend's auth API. People enter their
-// email, open the link we send them, and pick a username the first time.
-// Nothing shows when there's no backend.
+// Signing up, in, and out, and changing your account, through the backend's
+// auth API. People sign up with an email, username, and password, and confirm
+// the email with a link we send. They sign in with their email or username and
+// password, or with a link we email them instead. Nothing shows when there's
+// no backend.
 
 import { api } from './api.ts'
 import { el } from './dom.ts'
 import { getParam, setParam } from './url.ts'
 
 export interface User {
+    email: string
     username: string | null
     displayUsername: string | null
     role?: string | null
@@ -17,23 +20,35 @@ const call = (path: string, body?: object) => api<any>('auth/' + path, body)
 
 const getUser = async (): Promise<User | null> => (await call('get-session'))?.user ?? null
 
+// Links in our emails bring people back to this view of the map.
+const here = () => location.pathname + location.search
+
 export const linkButton = (text: string, onClick: () => void) => {
     const button = el('button', { type: 'button', class: 'link' }, text)
     button.addEventListener('click', onClick)
     return button
 }
 
-// A one-field form that shows what went wrong if submitting fails.
-function form(input: HTMLInputElement, label: string, onSubmit: (value: string) => Promise<void>) {
+const input = (type: string, placeholder: string, autocomplete: string, value = '') =>
+    Object.assign(el('input', { type, required: true, placeholder, autocomplete }), { value })
+const password = (placeholder = 'Password', autocomplete = 'current-password') =>
+    Object.assign(input('password', placeholder, autocomplete), { minLength: 8 })
+
+// A form that shows what went wrong if submitting fails. One field sits beside
+// its button; more stack above it.
+function form(fields: HTMLInputElement[], label: string, onSubmit: (...values: string[]) => Promise<void>) {
     const error = el('div', { class: 'error' })
     const button = el('button', {}, label)
-    const node = el('form', {}, [el('div', { class: 'row' }, [input, button]), error])
+    const node = el('form', {}, [
+        el('div', { class: fields.length > 1 ? 'row stack' : 'row' }, [...fields, button]),
+        error,
+    ])
     node.addEventListener('submit', async e => {
         e.preventDefault()
         error.textContent = ''
         button.disabled = true
         try {
-            await onSubmit(input.value.trim())
+            await onSubmit(...fields.map(f => f.type === 'password' ? f.value : f.value.trim()))
         } catch (e) {
             error.textContent = (e as Error).message
         } finally {
@@ -43,8 +58,10 @@ function form(input: HTMLInputElement, label: string, onSubmit: (value: string) 
     return node
 }
 
-// `links` are shown once someone's signed in and has a username, e.g. to the editor.
-export async function createAccount(box: HTMLElement, links: (user: User) => Promise<Node[]>) {
+const links = (...children: Node[]) => el('div', { class: 'links' }, children)
+
+// `extraLinks` are shown once someone's signed in and has a username, e.g. to the editor.
+export async function createAccount(box: HTMLElement, extraLinks: (user: User) => Promise<Node[]>) {
     let user: User | null
     try {
         user = await getUser()
@@ -55,34 +72,102 @@ export async function createAccount(box: HTMLElement, links: (user: User) => Pro
         box.replaceChildren(...children)
         box.querySelector('input')?.focus()
     }
+    const back = () => linkButton('Back', () => signIn())
 
     function signedOut() {
-        show(linkButton('Sign in', () => askEmail()), ' to suggest changes to the map')
+        show(linkButton('Sign in', () => signIn()), ' or ', linkButton('sign up', signUp), ' to suggest changes to the map')
     }
 
-    function askEmail(problem = '') {
-        const input = el('input', { type: 'email', required: true, placeholder: 'Your email', autocomplete: 'email' })
-        show(problem, form(input, 'Email me a link', async email => {
-            // The link brings them back to this view of the map.
-            await call('sign-in/magic-link', { email, callbackURL: location.pathname + location.search })
-            show(`Check ${email} for a sign-in link.`)
-        }))
+    function signIn(notice = '') {
+        const login = input('text', 'Email or username', 'username')
+        show(notice, form([login, password()], 'Sign in', async (login, password) => {
+            try {
+                await (login.includes('@')
+                    ? call('sign-in/email', { email: login, password, callbackURL: here() })
+                    : call('sign-in/username', { username: login, password, callbackURL: here() }))
+            } catch (e) {
+                // Signing in sends the confirmation link again.
+                if (/not verified/i.test((e as Error).message)) throw new Error('Check your email for a link to confirm it first.', { cause: e })
+                throw e
+            }
+            user = await getUser()
+            signedIn()
+        }), links(linkButton('Forgot password?', forgotPassword), linkButton('Email me a link', emailLink), linkButton('Sign up', signUp)))
+    }
+
+    function signUp() {
+        const fields = [input('text', 'Username', 'username'), input('email', 'Email', 'email'), password('Password (8+ characters)', 'new-password')]
+        show(form(fields, 'Sign up', async (username, email, password) => {
+            await call('sign-up/email', { username, displayUsername: username, name: username, email, password, callbackURL: here() })
+            show(`Check ${email} for a link to confirm it, then you're in.`)
+        }), links(linkButton('I already have an account', () => signIn())))
+    }
+
+    // Asks for an email, and sends it something.
+    function askEmail(label: string, send: (email: string) => Promise<void>) {
+        show(form([input('email', 'Your email', 'email')], label, async email => {
+            await send(email)
+            show(`Check ${email} for a link.`, links(back()))
+        }), links(back()))
+    }
+
+    const emailLink = () => askEmail('Email me a link', email => call('sign-in/magic-link', { email, callbackURL: here() }))
+    const forgotPassword = () => askEmail('Reset password', email => call('request-password-reset', { email, redirectTo: here() }))
+
+    // Where the link in a password reset email lands.
+    function newPassword(token: string) {
+        show(form([password('New password', 'new-password')], 'Save', async newPassword => {
+            await call('reset-password', { token, newPassword })
+            signIn('Your new password is saved. Sign in with it.')
+        }), links(back()))
     }
 
     function askUsername() {
-        const input = el('input', { required: true, placeholder: 'Pick a username', autocomplete: 'username' })
-        show(form(input, 'Save', async username => {
+        show(form([input('text', 'Pick a username', 'username')], 'Save', async username => {
             await call('update-user', { username, displayUsername: username, name: username })
             user = await getUser()
             signedIn()
         }), linkButton('Sign out', signOut))
     }
 
-    async function signedIn() {
+    async function signedIn(notice = '') {
         if (!user?.username) return askUsername()
-        const extra = await links(user).catch(() => [])
-        show('Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ', linkButton('Sign out', signOut),
-            ...extra.length ? [el('div', { class: 'links' }, extra)] : [])
+        const extra = await extraLinks(user).catch(() => [])
+        show(...notice ? [notice, el('br')] : [],
+            'Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ',
+            linkButton('Account', settings), ' · ', linkButton('Sign out', signOut),
+            ...extra.length ? [links(...extra)] : [])
+    }
+
+    async function settings() {
+        if (!user) return
+        const hasPassword = (await call('list-accounts').catch(() => [])).some((a: { providerId: string }) => a.providerId === 'credential')
+        const heading = (text: string) => el('div', {}, el('strong', {}, text))
+        show(
+            heading('Username'),
+            form([input('text', 'Username', 'username', user.displayUsername ?? user.username ?? '')], 'Save', async username => {
+                await call('update-user', { username, displayUsername: username, name: username })
+                user = await getUser()
+                signedIn('Your username is saved.')
+            }),
+            heading('Email'),
+            form([input('email', 'Email', 'email', user.email)], 'Save', async newEmail => {
+                await call('change-email', { newEmail, callbackURL: here() })
+                signedIn(`Check ${newEmail} for a link to confirm it. Until then, your email stays ${user!.email}.`)
+            }),
+            heading('Password'),
+            hasPassword
+                ? form([password('Current password'), password('New password', 'new-password')], 'Change', async (currentPassword, newPassword) => {
+                    await call('change-password', { currentPassword, newPassword })
+                    signedIn('Your new password is saved.')
+                })
+                // People who've only signed in with a link set one like they'd reset it.
+                : el('div', { class: 'row' }, linkButton('Email me a link to set a password', async () => {
+                    await call('request-password-reset', { email: user!.email, redirectTo: here() })
+                    signedIn(`Check ${user!.email} for a link to set a password.`)
+                })),
+            links(linkButton('Done', () => signedIn())),
+        )
     }
 
     async function signOut() {
@@ -95,11 +180,16 @@ export async function createAccount(box: HTMLElement, links: (user: User) => Pro
         signedOut()
     }
 
-    // A sign-in link that didn't work comes back with ?error=.
+    // A link from one of our emails that didn't work comes back with ?error=,
+    // and a password reset link that did with ?token=.
+    const token = getParam('token')
+    setParam('token', null)
     if (getParam('error')) {
         setParam('error', null)
-        if (!user) return askEmail("That sign-in link didn't work. It may have expired or been used already.")
+        const problem = "That link didn't work. It may have expired or been used already."
+        return user ? signedIn(problem) : signIn(problem)
     }
-    if (user) signedIn()
+    if (token) newPassword(token)
+    else if (user) signedIn()
     else signedOut()
 }
