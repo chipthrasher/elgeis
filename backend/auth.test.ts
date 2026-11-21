@@ -36,6 +36,8 @@ test('sign in with an email link, pick a username, and sign out', { skip }, asyn
     assert.match(reused.headers.get('location')!, /error=/)
 
     assert.equal((await request('/api/auth/update-user', { username: 'x' })).status, 400) // too short
+    // Display names go into git as commit authors.
+    assert.equal((await request('/api/auth/update-user', { username: 'steve_1', displayUsername: 'Steve <x@y>' })).status, 400)
     assert.equal((await request('/api/auth/update-user', { username: 'Steve_1', displayUsername: 'Steve_1', name: 'Steve_1' })).status, 200)
     session = await (await request('/api/auth/get-session')).json()
     assert.equal(session.user.username, 'steve_1')

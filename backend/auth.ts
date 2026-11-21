@@ -11,6 +11,11 @@ import type { Db } from './db.ts'
 
 const DAY = 60 * 60 * 24
 
+// What usernames, and display names (a username in its own case), can hold.
+// Display names go into git as commit authors, so they mustn't hold `<`, `>`,
+// or newlines. Better Auth checks usernames this way already.
+export const USERNAME_CHARS = /^[a-zA-Z0-9_.]+$/
+
 export interface AuthOptions {
     siteUrl: string
     secret: string
@@ -30,7 +35,7 @@ export function createAuth(db: Db, { siteUrl, secret, sendMail }: AuthOptions) {
                     `Click this link to sign in to the Elgeis Map:\n\n${url}\n\n` +
                     `It works once, for the next 15 minutes. If you didn't ask to sign in, you can ignore this email.\n`),
             }),
-            username(),
+            username({ displayUsernameValidator: name => USERNAME_CHARS.test(name) }),
             // Site admins (role "admin") and site-wide bans.
             admin(),
         ],

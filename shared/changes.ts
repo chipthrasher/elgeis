@@ -46,7 +46,8 @@ export const Op = z.discriminatedUnion('op', [
 ]) as unknown as z.ZodType<Op>
 
 export const RequestBody = z.object({
-    title: z.string().trim().max(200),
+    // The title becomes the first line of the approval's commit message.
+    title: z.string().trim().max(200).regex(/^[^\p{Cc}]*$/u, 'A title has to be one line, without special characters'),
     ops: z.array(Op).max(500),
 }).strict()
 
