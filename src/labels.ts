@@ -6,7 +6,7 @@ import L from 'leaflet'
 import polylabel from 'polylabel'
 import { DIMENSION_SCALE, type Position } from '../shared/layer.ts'
 import { el } from './dom.ts'
-import type { MapObject } from './layers.ts'
+import { paneFor, type MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 
 interface Label {
@@ -18,7 +18,6 @@ interface Label {
 
 // Returns a function that stops refitting them; they're removed with their objects.
 export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObject) => string) {
-    if (!map.getPane('labels')) map.createPane('labels').style.zIndex = '450' // above polygons and lines, below points
     const labels: Label[] = []
 
     for (const o of objects) {
@@ -39,7 +38,8 @@ export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObje
             icon: L.divIcon({ className: 'polygon-label', html: span }),
             interactive: false,
             keyboard: false,
-            pane: 'labels',
+            // Above its layer's polygons and lines, below its points.
+            pane: paneFor(o.layer.id, 'labels'),
         }))
         labels.push({ span, latLng, room: pole.distance * scale })
     }

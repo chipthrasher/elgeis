@@ -12,11 +12,16 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { objectVersion } from '../shared/changes.ts'
 import { formatJson } from '../shared/format.ts'
-import type { LayerData, LayerObject } from '../shared/layer.ts'
+import type { Layer, LayerData, LayerObject } from '../shared/layer.ts'
 import { buildLayers } from '../scripts/build-layers.ts'
 
 const git = (dir: string, ...args: string[]) =>
     execFileSync('git', ['-c', 'user.name=Elgeis Map', '-c', 'user.email=map@localhost', ...args], { cwd: dir, stdio: 'pipe', encoding: 'utf8' })
+
+export interface Author {
+    name: string
+    email: string
+}
 
 export interface Commit {
     // The layers to write, as they should be after the commit.
@@ -24,7 +29,7 @@ export interface Commit {
     // The IDs of the objects to write (or delete, when they're no longer in
     // their layer), by layer.
     changed: Map<string, string[]>
-    author: { name: string, email: string }
+    author: Author
     message: string
 }
 
@@ -33,34 +38,77 @@ export class LayersRepo {
     readonly buildDir: string
     // Every layer, including hidden objects, as of the last commit.
     data: LayerData[]
+    // Layers a site admin has hidden, which are left out of the static JSON.
+    hidden: Set<string>
 
-    constructor(dir: string, buildDir: string, remote: string) {
+    constructor(dir: string, buildDir: string, remote: string, hidden = new Set<string>()) {
         if (!fs.existsSync(path.join(dir, '.git'))) {
             fs.mkdirSync(dir, { recursive: true })
             git(dir, 'clone', '--quiet', remote, '.')
         }
         this.dir = dir
         this.buildDir = buildDir
-        this.data = buildLayers(dir, buildDir)
+        this.hidden = hidden
+        this.data = this.build()
+    }
+
+    private build() {
+        return buildLayers(this.dir, this.buildDir, this.hidden)
+    }
+
+    // Rebuild the static JSON, e.g. once a layer is hidden or shown.
+    rebuild() {
+        this.data = this.build()
     }
 
     // Write the changed objects, commit, and rebuild. Undoes the commit if the
     // build fails. Returns the commit's hash.
     commit({ layers, changed, author, message }: Commit): string {
-        const head = git(this.dir, 'rev-parse', 'HEAD').trim()
-        try {
+        return this.commitFiles(author, message, () => {
             for (const [layerId, ids] of changed) {
                 const objects = new Map(layers.find(l => l.layer.id === layerId)!.objects.map(o => [o.id, o]))
                 for (const id of ids) {
-                    const file = path.join(this.dir, layerId, id + '.json')
                     const object = objects.get(id)
-                    if (object) fs.writeFileSync(file, formatJson(object))
-                    else fs.rmSync(file, { force: true })
+                    this.write(layerId, id, object && formatJson(object))
                 }
-                git(this.dir, 'add', '--all', '--', layerId)
             }
+        })
+    }
+
+    // Write a layer's manifest (its name and schema), making its folder if
+    // it's new, and commit it along with any of its objects that change with
+    // it (e.g. losing a field the schema dropped).
+    writeLayer(layer: Layer, objects: LayerObject[], author: Author, message: string): string {
+        return this.commitFiles(author, message, () => {
+            fs.mkdirSync(path.join(this.dir, layer.id), { recursive: true })
+            this.write(layer.id, 'layer', formatJson(layer))
+            for (const object of objects) this.write(layer.id, object.id, formatJson(object))
+        })
+    }
+
+    // Delete a layer's folder, and commit.
+    deleteLayer(layerId: string, author: Author, message: string): string {
+        return this.commitFiles(author, message, () => fs.rmSync(path.join(this.dir, layerId), { recursive: true, force: true }))
+    }
+
+    // Write (or, without text, delete) one file in a layer's folder.
+    private write(layerId: string, name: string, text: string | undefined) {
+        const file = path.join(this.dir, layerId, name + '.json')
+        if (text) fs.writeFileSync(file, text)
+        else fs.rmSync(file, { force: true })
+    }
+
+    // Make changes to the files, commit them, and rebuild. Undoes it all if
+    // anything fails, like the build. Returns the commit's hash, or if
+    // nothing changed, the current one.
+    private commitFiles(author: Author, message: string, change: () => void): string {
+        const head = git(this.dir, 'rev-parse', 'HEAD').trim()
+        try {
+            change()
+            git(this.dir, 'add', '--all')
+            if (!git(this.dir, 'status', '--porcelain').trim()) return head
             git(this.dir, 'commit', '--quiet', `--author=${author.name} <${author.email}>`, `--message=${message}`)
-            this.data = buildLayers(this.dir, this.buildDir)
+            this.data = this.build()
         } catch (e) {
             git(this.dir, 'reset', '--quiet', '--hard', head)
             throw e
@@ -86,7 +134,7 @@ export class LayersRepo {
         const undo = (problem: string) => {
             try { git(this.dir, 'rebase', '--abort') } catch { /* not mid-rebase */ }
             git(this.dir, 'reset', '--quiet', '--hard', head)
-            this.data = buildLayers(this.dir, this.buildDir)
+            this.data = this.build()
             return new Error(`The layers repo's remote has commits that ${problem}, so they weren't pulled in. ` +
                 `Fix the remote, or rebase this site's repo onto it by hand.`)
         }
@@ -96,7 +144,7 @@ export class LayersRepo {
             throw undo("conflict with this site's unpushed changes")
         }
         try {
-            this.data = buildLayers(this.dir, this.buildDir)
+            this.data = this.build()
         } catch (e) {
             throw undo(`don't build (${(e as Error).message})`)
         }

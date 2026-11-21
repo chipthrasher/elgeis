@@ -1,4 +1,5 @@
-// Map state lives in the URL (?q=search&layers=a,b) so views can be shared.
+// Map state lives in the URL (?q=search&layers=a,b&x=0&z=0&zoom=-3) so views
+// can be shared.
 
 export function getParam(name: string): string | null {
     return new URLSearchParams(location.search).get(name)

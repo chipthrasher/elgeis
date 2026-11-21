@@ -2,13 +2,13 @@
 // keep their own cookies.
 
 import { createAuth } from './auth.ts'
-import { createApp } from './main.ts'
+import { createApp, type AppOptions } from './main.ts'
 import { testDb } from './test-db.ts'
 import { testRepo } from './test-layers.ts'
 
 export const SITE = 'http://map.test'
 
-export async function testApp() {
+export async function testApp(options: AppOptions = {}) {
     const db = await testDb()
     const layers = testRepo()
     await db.insertInto('layer').values({ id: 'political' }).execute()
@@ -18,7 +18,7 @@ export async function testApp() {
         secret: 'test-secret-that-is-long-enough-to-use',
         sendMail: async (to, _subject, text) => { mail.push({ to, text }) },
     })
-    const { app, reconcile } = createApp(auth, db, layers.repo, SITE)
+    const { app, reconcile } = createApp(auth, db, layers.repo, SITE, { mailFrom: 'Elgeis Map <map@example.com>', ...options })
 
     // A tiny browser: keeps cookies and sends the site's Origin.
     function browser() {

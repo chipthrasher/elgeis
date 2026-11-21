@@ -27,6 +27,19 @@ function swatch(colors: string[]): string {
     return `linear-gradient(to right, ${bands.join(', ')})`
 }
 
+// The swatch's shape follows the object's: a circle for a point, a line for a
+// line, and a hexagon for an area.
+function shapeOf(geometry: { type: string, geometries?: { type: string }[] } | null): 'point' | 'line' | 'area' {
+    switch (geometry?.type) {
+        case 'Point':
+        case 'MultiPoint': return 'point'
+        case 'LineString':
+        case 'MultiLineString': return 'line'
+        case 'GeometryCollection': return shapeOf(geometry.geometries?.[0] ?? null)
+        default: return 'area'
+    }
+}
+
 // `pick` gets first go at clicks on the map's objects, for the editor.
 export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex, pick: (o: MapObject) => boolean) {
     const searchInput = document.querySelector<HTMLInputElement>('.search')!
@@ -94,7 +107,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         return el('details', { class: 'item' }, [
             el('summary', {}, [
                 el('div', { class: 'itemleft' }, index.title(o)),
-                el('div', { class: 'itemright', style: colors.length ? `background: ${swatch(colors)}` : undefined }, ' '),
+                el('div', { class: 'itemright' },
+                    colors.length ? el('div', { class: `swatch swatch-${shapeOf(o.object.geometry)}`, style: `background: ${swatch(colors)}` }) : null),
             ]),
             el('div', { class: 'itemcontent' }, [
                 pos && el('div', { class: 'coords' }, `${pos[0]}, ${pos[1]}`),
@@ -143,7 +157,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
 
             // Polygons have their names drawn inside them instead (see labels.ts).
             if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
-                o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0] })
+                // A line's card follows the mouse along it.
+                o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0], sticky: /LineString/.test(o.object.geometry?.type ?? '') })
             }
             o.drawn!.on('mouseover', () => highlight(o, true))
             o.drawn!.on('mouseout', () => highlight(o, false))

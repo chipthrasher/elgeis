@@ -19,6 +19,16 @@ const DAY = 60 * 60 * 24
 // or newlines. Better Auth checks usernames this way already.
 export const USERNAME_CHARS = /^[a-zA-Z0-9_.]+$/
 
+// Names that would pass for the site's own staff, which nobody can take, and
+// slurs, which no name can hold. Dots and underscores don't get around them.
+// (Site admins' own usernames are already taken, so nobody else can have them.)
+const RESERVED = ['admin', 'administrator', 'moderator', 'mod', 'elgeis', 'root', 'support', 'staff', 'system', 'official']
+const SLURS = ['nigger', 'nigga', 'faggot', 'retard', 'tranny', 'kike', 'cunt']
+export function allowedUsername(name: string) {
+    const plain = name.toLowerCase().replace(/[._]/g, '')
+    return USERNAME_CHARS.test(name) && !RESERVED.includes(plain) && !SLURS.some(s => plain.includes(s))
+}
+
 export interface AuthOptions {
     siteUrl: string
     secret: string
@@ -33,6 +43,10 @@ export function createAuth(db: Db, { siteUrl, secret, sendMail }: AuthOptions) {
         secret,
         database: { db, type: 'postgres' },
         session: { expiresIn: 365 * DAY, updateAge: DAY },
+        // Limits how often each address can sign in, sign up, and send
+        // email, in production. Caddy passes on the client's address in
+        // X-Forwarded-For, having checked it against TRUSTED_PROXIES.
+        rateLimit: { storage: 'database' },
         emailAndPassword: {
             enabled: true,
             requireEmailVerification: true,
@@ -67,7 +81,8 @@ export function createAuth(db: Db, { siteUrl, secret, sendMail }: AuthOptions) {
                     `Click this link to sign in to the Elgeis Map:\n\n${url}\n\n` +
                     `It works once, for the next 15 minutes. ${IGNORE}\n`),
             }),
-            username({ displayUsernameValidator: name => USERNAME_CHARS.test(name) }),
+            // Checked on signing up and on changing usernames.
+            username({ usernameValidator: allowedUsername, displayUsernameValidator: allowedUsername }),
             // Site admins (role "admin") and site-wide bans.
             admin(),
         ],
