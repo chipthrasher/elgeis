@@ -331,9 +331,20 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             return { type: 'Feature', id: start.id || newId(idPrefixFor(g)), geometry: g, properties }
         }
 
+        // Something new needs a title (its Name, or whatever the layer calls it),
+        // so it can be listed and found. Existing things are left as they are.
+        const titleField = layer.fields.find(f => f.key === layer.titleField)!
+        const titleNode = inputs.find(i => i.field === titleField)?.node
+        const titleInput = titleNode?.querySelector('input')
+        if (!original) titleNode?.querySelector('span')?.append(' (required)')
+
         async function submit() {
             await attempt(error, async () => {
                 const object = read()
+                if (!original && !object.properties[titleField.key]) {
+                    titleInput?.focus()
+                    throw new Error(`Give it a ${titleField.label.toLowerCase()} first`)
+                }
                 if (shapeKind && !object.geometry) throw new Error('Draw its shape first')
                 const ops: Op[] = [original
                     ? { op: 'update', baseVersion: objectVersion(original), object }
