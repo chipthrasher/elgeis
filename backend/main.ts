@@ -3,6 +3,7 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { auditApi, auditRoutes, pruneAudit } from './audit.ts'
 import { createAuth, type Auth } from './auth.ts'
 import { createDb, type Db } from './db.ts'
 import { currentUser, queue, type Env } from './http.ts'
@@ -35,10 +36,12 @@ export function createApp(auth: Auth, db: Db, repo: LayersRepo, siteUrl: string,
     const api = new Hono<Env>()
     if (limits) api.use(rateLimit(db, limits))
     api.use(currentUser(auth))
+    api.use(auditApi(db))
     api.route('/', requests.app)
     api.route('/', layerRoutes(deps, requests))
     api.route('/', userRoutes(deps))
     api.route('/', notificationRoutes(db, auth.options.secret!))
+    api.route('/', auditRoutes(db))
     app.route('/', api)
 
     // Errors are JSON, like Better Auth's, with a message to show.
@@ -66,6 +69,10 @@ if (import.meta.main) {
     await reconcile()
     // Pick up edits made to the layers remote directly.
     setInterval(() => reconcile().catch(e => console.error('Catching up with the layers repo failed:', e)), 5 * 60 * 1000)
+    // Keep the audit log to a year.
+    const prune = () => pruneAudit(db).catch(e => console.error('Pruning the audit log failed:', e))
+    await prune()
+    setInterval(prune, 24 * 60 * 60 * 1000)
     // Send queued notifications. One run at a time, so none goes out twice.
     let sending = false
     setInterval(async () => {
