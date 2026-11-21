@@ -24,7 +24,8 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 
 ## Community layers
 
-- **Any account can create a new layer.** Once saved, it exists right away, and its creator is its first admin.
+- **Any account can create a new layer.** Once saved, it exists right away, and its creator is its first admin. A new layer starts with a name and a description field, and its admins add more.
+- **Layer admins run their layer.** They edit its name, description, and schema, and add or remove other admins (a layer always keeps at least one, unless a site admin removes it). Each schema edit is one commit to the layers repo. Removing a field removes its values from the layer's objects in the same commit; changing a field's type is refused if the objects' values don't fit it.
 - **Community layers are hidden by default.** The official layers (the political map and the Nether highway) show by default. To see a community layer, a viewer opens the list of community layers and enables it.
 - **The layers being viewed are stored in a URL param** (e.g. `?layers=political,nether,lay_3k9x2m`), so people can share custom views. This works alongside the existing `q` search param.
 
@@ -44,8 +45,20 @@ Layers should have 1 to many Admins (users) who can approve change requests. Cha
 
 - **Site admins** are a small set of accounts with power over the whole site.
 - **Bans are site-wide.** A site admin can ban an account from submitting change requests to any layer.
-- **Site admins can hide or delete community layers.** Hiding is reversible and drops the layer from the community list; deleting removes it.
-- **Site admins decide which layers are official** and shown by default. The political map and the Nether highway start out official.
+- **Site admins can hide or delete community layers.** Hiding is reversible: it's kept in Postgres, and the layer is left out of the static JSON, so it drops off the map and out of the community list. Deleting removes the layer's folder from the layers repo, and its change requests with it, and is refused while another layer still points at its objects.
+- **Site admins decide which layers are official** and shown by default. The political map and the Nether highway start out official. Official layers can't be hidden or deleted.
+
+## Email notifications
+
+Notifications are queued in Postgres and sent in the background every few seconds, so a slow or broken mail server never holds up the site. Each one is tried up to five times. Sign-in emails don't go through the queue. Each email links to its change request (`?request=<id>`).
+
+- **Review requests:** a submitted change request emails its layer's admins, or the site admins if the layer has none. The author never emails themselves.
+- **Approvals and rejections** email the author, with the reviewer's comment.
+- **Stale notices** email the author when something their open request changes has changed since.
+
+## Rate limits
+
+Rate limits are kept in Postgres, by the client's address. Caddy works the address out from `X-Forwarded-For`, believing it only from `TRUSTED_PROXIES`, and passes it on to the backend, which is only reachable through Caddy. Better Auth limits signing in, signing up, and sending sign-in email; the backend limits each address to 60 changes (anything but reading) a minute to the rest of the API. Both apply in production only.
 
 ## Storage
 

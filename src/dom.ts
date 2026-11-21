@@ -37,3 +37,21 @@ export function safeUrl(url: string): string | null {
         return null
     }
 }
+
+export const button = (text: string, onClick: () => void, cls = '') => {
+    const b = el('button', { type: 'button', class: cls }, text)
+    b.addEventListener('click', onClick)
+    return b
+}
+
+export const errorBox = () => el('div', { class: 'error' })
+
+// Run an action, showing what went wrong in the box if it fails.
+export async function attempt(box: HTMLElement, action: () => Promise<void>) {
+    box.textContent = ''
+    try {
+        await action()
+    } catch (e) {
+        box.textContent = (e as Error).message
+    }
+}
