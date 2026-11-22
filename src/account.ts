@@ -70,6 +70,10 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
         // No backend: nobody can sign in.
         return
     }
+    // On phones, the box is behind an Account button (see style.css).
+    const toggle = el('button', { type: 'button', class: 'account-toggle' }, 'Account')
+    toggle.addEventListener('click', () => box.parentElement!.classList.toggle('account-open'))
+    box.before(toggle)
     const show = (...children: (Node | string)[]) => {
         box.replaceChildren(...children)
         box.querySelector('input')?.focus()

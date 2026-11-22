@@ -9,7 +9,7 @@
 // layers are listed, shown or not, is kept in this browser's local storage.
 
 import L from 'leaflet'
-import { el } from './dom.ts'
+import { el, mobile } from './dom.ts'
 import { stackLayers } from './layers.ts'
 import { getParam, setParam } from './url.ts'
 
@@ -63,7 +63,17 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
     const moreButton = el('button', { type: 'button', class: 'see-more' }, 'See more')
     moreButton.addEventListener('click', more)
     const rows = el('div')
-    const container = el('div', { class: 'leaflet-control-layers leaflet-control-layers-expanded layer-control' }, [moreButton, rows])
+    // On phones it starts collapsed to Leaflet's layers icon, and collapses
+    // again when the map is tapped.
+    const toggle = el('a', { class: 'leaflet-control-layers-toggle', href: '#', title: 'Layers', role: 'button' })
+    const container = el('div', { class: 'leaflet-control-layers layer-control' }, [
+        toggle,
+        el('div', { class: 'leaflet-control-layers-list' }, [moreButton, rows]),
+    ])
+    const expand = (on: boolean) => container.classList.toggle('leaflet-control-layers-expanded', on)
+    expand(!mobile.matches)
+    toggle.addEventListener('click', e => { e.preventDefault(); expand(true) })
+    map.on('click', () => { if (mobile.matches) expand(false) })
 
     function render() {
         rows.replaceChildren(...order.map(t => row(t, true)), ...fixed.map(t => row(t, false)))

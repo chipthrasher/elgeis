@@ -55,3 +55,6 @@ export async function attempt(box: HTMLElement, action: () => Promise<void>) {
         box.textContent = (e as Error).message
     }
 }
+
+// Phones, where the layout changes (see the end of style.css).
+export const mobile = matchMedia('(max-width: 48rem)')

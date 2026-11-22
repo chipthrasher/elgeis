@@ -65,6 +65,24 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         items.get(o)?.querySelector('summary')?.classList.toggle('hover', on)
     }
 
+    // Hovering an object or its entry highlights it and shows its card. With
+    // touch, a tap does, until the next tap. Browsers can send a stray
+    // mouseout once a tap changes the page, which this ignores.
+    let touch = false
+    let tapped: MapObject | null = null
+    function hover(o: MapObject, on: boolean) {
+        if (touch && !on) return
+        if (touch) tapped = o
+        highlight(o, on)
+        if (!on) o.drawn?.closeTooltip()
+    }
+    document.addEventListener('pointerdown', e => {
+        touch = false
+        if (tapped) hover(tapped, false)
+        tapped = null
+        touch = e.pointerType === 'touch'
+    }, true)
+
     /* Directory entries */
 
     // Show a field's value. Fields with icons are collected into one row instead.
@@ -162,17 +180,20 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
 
             const summary = item.querySelector('summary')!
             summary.addEventListener('click', () => { openDirectory(false); reveal(o) })
-            summary.addEventListener('mouseenter', () => { highlight(o, true); o.drawn?.openTooltip() })
-            summary.addEventListener('mouseleave', () => { highlight(o, false); o.drawn?.closeTooltip() })
+            summary.addEventListener('mouseenter', () => { hover(o, true); o.drawn?.openTooltip() })
+            summary.addEventListener('mouseleave', () => hover(o, false))
 
             // Polygons have their names drawn inside them instead (see labels.ts).
             if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
                 // A line's card follows the mouse along it.
                 o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0], sticky: /LineString/.test(o.object.geometry?.type ?? '') })
             }
-            o.drawn!.on('mouseover', () => highlight(o, true))
-            o.drawn!.on('mouseout', () => highlight(o, false))
-            o.drawn!.on('click', () => { if (!pick(o)) select(o) })
+            // Leaflet opens the card on mouseover and on click, and hover()
+            // closes it.
+            o.drawn!.off('mouseout', o.drawn!.closeTooltip)
+            o.drawn!.on('mouseover', () => hover(o, true))
+            o.drawn!.on('mouseout', () => hover(o, false))
+            o.drawn!.on('click', () => { hover(o, true); if (!pick(o)) select(o) })
         }
         sections.set(mapLayer, section)
         directory.append(section)

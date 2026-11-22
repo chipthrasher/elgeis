@@ -6,7 +6,7 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { DIMENSION_SCALE } from '../shared/layer.ts'
-import { el } from './dom.ts'
+import { el, mobile } from './dom.ts'
 import { getParam, setParam } from './url.ts'
 
 // Leaflet's Simple CRS puts north (negative z) up when lat = -z.
@@ -47,18 +47,24 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
     // main.ts decides whether it shows.
     const dynmap = L.imageOverlay('dynmap.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'dynmap', pane: 'tilePane' })
 
-    // Coordinate readout (top-left), updated as the mouse moves.
+    // Coordinate readout (top-left), updated as the mouse moves. Phones have
+    // no mouse, so there it shows the block under a crosshair in the middle.
     const readout = L.DomUtil.create('div', 'map-box leaflet-control-coordinates')
     const Coords = L.Control.extend({ onAdd: () => readout })
     new Coords({ position: 'topleft' }).addTo(map)
-    map.on('mousemove', (e: L.LeafletMouseEvent) => {
-        const x = Math.round(e.latlng.lng), z = Math.round(-e.latlng.lat)
+    map.getContainer().append(el('div', { class: 'crosshair' }))
+    function showCoords(latlng: L.LatLng) {
+        const x = Math.round(latlng.lng), z = Math.round(-latlng.lat)
         const scale = DIMENSION_SCALE.nether
         readout.replaceChildren(
             el('strong', {}, 'Overworld:'), el('div', { class: 'mono' }, `${x}, ${z}`),
             el('strong', {}, 'Nether:'), el('div', { class: 'mono' }, `${Math.floor(x / scale)}, ${Math.floor(z / scale)}`),
         )
-    })
+    }
+    const showCenter = () => { if (mobile.matches) showCoords(map.getCenter()) }
+    map.on('mousemove', (e: L.LeafletMouseEvent) => { if (!mobile.matches) showCoords(e.latlng) })
+    map.on('move resize', showCenter)
+    showCenter()
 
     // Keep the view in the URL whenever it settles, leaving out the home view.
     // Also tidies up a URL whose view was nonsense or out of bounds.

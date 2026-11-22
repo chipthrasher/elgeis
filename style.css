@@ -136,7 +136,9 @@ a {
 }
 
 /* Only on phones (see the end) */
-.directory-toggle {
+.directory-toggle,
+.account-toggle,
+.crosshair {
   display: none;
 }
 
@@ -1177,9 +1179,9 @@ dialog.browse .browse-row > button {
     top: 3px;
   }
 
-  .directory-toggle {
+  .directory-toggle,
+  .account-toggle {
     display: block;
-    margin-left: 0.75rem;
     font: inherit;
     font-weight: 500;
     color: var(--col-lightest);
@@ -1188,6 +1190,15 @@ dialog.browse .browse-row > button {
     border-radius: 0.5rem;
     padding: 0.6rem 0.9rem;
     cursor: pointer;
+  }
+
+  .directory-toggle {
+    margin-left: 0.75rem;
+  }
+
+  .account-toggle {
+    background: var(--col-darker);
+    box-shadow: var(--box-shadow);
   }
 
   #map {
@@ -1210,5 +1221,69 @@ dialog.browse .browse-row > button {
 
   .directory-open #map {
     display: none;
+  }
+
+  /* The account box opens from its button, and the editor panel covers the
+     map, its close button sticking at the top. The corner lets taps through
+     to the map. */
+  .corner {
+    inset: 0;
+    padding: 0.75rem;
+    max-width: none;
+    max-height: none;
+    pointer-events: none;
+  }
+
+  .corner > * {
+    pointer-events: auto;
+  }
+
+  .corner:not(.account-open) .account {
+    display: none;
+  }
+
+  .panel {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    border-radius: 0;
+    padding-top: 0;
+  }
+
+  .panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    align-items: center;
+    padding-top: 0.5rem;
+    background: var(--col-darker);
+  }
+
+  .panel .close {
+    font-size: 2rem;
+    padding: 0.25rem 0.5rem;
+    margin-right: -0.5rem;
+  }
+
+  /* Marks the block the coordinate readout shows */
+  .crosshair {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.25rem;
+    height: 1.25rem;
+    transform: translate(-50%, -50%);
+    z-index: 700;
+    pointer-events: none;
+    background:
+      linear-gradient(white, white) center / 2px 100% no-repeat,
+      linear-gradient(white, white) center / 100% 2px no-repeat;
+    filter: drop-shadow(0 0 1px black);
+  }
+
+  /* Leaflet's dark layers icon, made light for the dark box */
+  .leaflet-container .leaflet-control-layers-toggle {
+    filter: invert(1);
   }
 }
