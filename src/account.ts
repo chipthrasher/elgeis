@@ -142,7 +142,9 @@ export async function createAccount(box: HTMLElement, extraLinks: (user: User) =
         show(...notice ? [notice, el('br')] : [],
             'Signed in as ', el('strong', {}, user.displayUsername ?? user.username), ' · ',
             linkButton('Account', settings), ' · ', linkButton('Sign out', signOut),
-            links(...extra))
+            // Editing isn't supported on phones (see style.css).
+            el('div', { class: 'links editing' }, extra),
+            el('div', { class: 'no-editing' }, 'Editing the map needs a bigger screen.'))
     }
 
     async function settings() {
