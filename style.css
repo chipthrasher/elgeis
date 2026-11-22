@@ -64,6 +64,7 @@ a {
 }
 
 #map {
+  position: relative;
   width: 100vw;
   height: 100vh;
   z-index: 7;
@@ -134,6 +135,11 @@ a {
   margin-bottom: 0.75rem;
 }
 
+/* Only on phones (see the end) */
+.directory-toggle {
+  display: none;
+}
+
 .search {
   font-family: var(--font-mono);
   color: var(--col-lightest);
@@ -149,7 +155,7 @@ a {
 
 /* The account box and the editor panel, stacked over the map, top right */
 .corner {
-  position: fixed;
+  position: absolute;
   top: 1rem;
   right: 1rem;
   z-index: 9;
@@ -1121,4 +1127,88 @@ dialog.browse .refused {
 
 dialog.browse .browse-row > button {
   align-self: center;
+}
+
+/* Phones: the sidebar becomes a search bar above the map, and the directory
+   takes the map's place when it's opened (see sidebar.ts). */
+
+@media (max-width: 48rem) {
+  body {
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  #sidebar {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+  }
+
+  .top {
+    padding: 0.75rem;
+  }
+
+  .title,
+  .subtitle,
+  .info,
+  .tiny,
+  #directory {
+    display: none;
+  }
+
+  .searchbox {
+    display: flex;
+    align-items: center;
+    margin: 0;
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+  }
+
+  /* Over the end of the search box, as before */
+  .clear svg {
+    top: 3px;
+  }
+
+  .directory-toggle {
+    display: block;
+    margin-left: 0.75rem;
+    font: inherit;
+    font-weight: 500;
+    color: var(--col-lightest);
+    background: var(--col-dark);
+    border: 0.1rem solid var(--col-light);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    cursor: pointer;
+  }
+
+  #map {
+    flex: 1;
+    min-height: 0;
+    width: auto;
+    height: auto;
+  }
+
+  .directory-open #sidebar {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .directory-open #directory {
+    display: block;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .directory-open #map {
+    display: none;
+  }
 }

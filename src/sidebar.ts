@@ -44,6 +44,7 @@ function shapeOf(geometry: { type: string, geometries?: { type: string }[] } | n
 export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex, pick: (o: MapObject) => boolean) {
     const searchInput = document.querySelector<HTMLInputElement>('.search')!
     const directory = document.querySelector('#directory')!
+    const directoryToggle = document.querySelector('.directory-toggle')!
     const items = new Map<MapObject, HTMLDetailsElement>()
 
     // Objects with a title and something on the map are listed and searchable.
@@ -126,6 +127,15 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         ])
     }
 
+    // On phones, the directory takes the map's place while it's open (see
+    // style.css). Elsewhere this does nothing.
+    function openDirectory(open: boolean) {
+        document.body.classList.toggle('directory-open', open)
+        directoryToggle.textContent = open ? 'Map' : 'Directory'
+        // The map may have been hidden, so have Leaflet measure it again.
+        map.invalidateSize()
+    }
+
     // Pan to an object if it's entirely off-screen.
     function reveal(o: MapObject) {
         const bounds = o.drawn?.getBounds()
@@ -151,7 +161,7 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             section.append(item)
 
             const summary = item.querySelector('summary')!
-            summary.addEventListener('click', () => reveal(o))
+            summary.addEventListener('click', () => { openDirectory(false); reveal(o) })
             summary.addEventListener('mouseenter', () => { highlight(o, true); o.drawn?.openTooltip() })
             summary.addEventListener('mouseleave', () => { highlight(o, false); o.drawn?.closeTooltip() })
 
@@ -230,7 +240,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         if (item.open) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
 
-    searchInput.addEventListener('input', search)
+    searchInput.addEventListener('input', () => { search(); openDirectory(true) })
+    directoryToggle.addEventListener('click', () => openDirectory(!document.body.classList.contains('directory-open')))
     document.querySelector('.clear')!.addEventListener('click', () => setSearch(''))
     directory.addEventListener('click', e => {
         const value = (e.target as Element).closest('[data-search]')?.getAttribute('data-search')
