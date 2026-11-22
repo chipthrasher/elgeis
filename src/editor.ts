@@ -25,6 +25,9 @@ interface Draft {
     layerId: string
     title: string
     ops: Op[]
+    // Something it changes has changed since (someone else's request was
+    // approved), so it needs updating before it can be submitted.
+    stale?: boolean
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -84,7 +87,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
 
     /* Saving drafts */
 
-    const toDraft = (r: ChangeRequest): Draft => ({ id: r.id, layerId: r.layerId, title: r.title, ops: r.ops })
+    const toDraft = (r: ChangeRequest): Draft => ({ id: r.id, layerId: r.layerId, title: r.title, ops: r.ops, stale: r.status === 'stale' })
 
     // Save the draft with these ops. The backend checks them, so a bad change
     // is refused before it's added.
@@ -94,6 +97,9 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
             ? await api<ChangeRequest>(`requests/${next.id}`, body, 'PUT')
             : await api<ChangeRequest>('requests', { ...body, layerId: next.layerId })
         draft = toDraft(saved)
+        // Catch up with the layer, so further changes start from what's
+        // there now.
+        if (draft.stale) await load(draft.layerId, true)
     }
 
     // Start or carry on a draft for this layer, picking up your latest one.
@@ -431,6 +437,10 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
                 }), 'link'),
             ]))),
             current.ops.length === 0 && el('p', { class: 'muted' }, 'No changes yet.'),
+            !!current.stale && el('p', { class: 'warning' }, [
+                'Something this changes has been changed since, so it needs updating before it can be submitted. ',
+                button('Update it', () => openRequest(current.id!), 'link'),
+            ]),
             error,
             el('div', { class: 'row' }, [
                 button('Submit for review', () => attempt(error, async () => {

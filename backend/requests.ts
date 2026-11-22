@@ -52,9 +52,13 @@ export function requestRoutes({ db, repo, siteUrl, serially }: Deps) {
     const layerName = (layerId: string) => repo.data.find(l => l.layer.id === layerId)?.layer.name ?? layerId
 
     // Throw if the ops aren't valid against the layers as they are now.
-    function check(layerId: string, ops: Op[]) {
-        const { errors } = checkOps(repo.data, layerId, ops)
+    // Returns the status a draft of them has: stale if what they change has
+    // changed since, which can still be saved (say, while someone else's
+    // request is approved), but has to be updated before it's submitted.
+    function check(layerId: string, ops: Op[]): Status {
+        const { errors, stale } = checkOps(repo.data, layerId, ops)
         if (errors.length) throw fail(400, errors.join('\n'))
+        return stale.length ? 'stale' : 'draft'
     }
 
     const usernames = db.selectFrom('user').select(['id', 'username'])
@@ -181,30 +185,30 @@ export function requestRoutes({ db, repo, siteUrl, serially }: Deps) {
         const user = signedIn(c)
         const body = await parseBody(c, RequestBody.extend({ layerId: z.string() }))
         if (!repo.data.some(l => l.layer.id === body.layerId)) throw fail(400, `No layer "${body.layerId}"`)
-        check(body.layerId, body.ops)
+        const status = check(body.layerId, body.ops)
         const open = await db.selectFrom('changeRequest').select(db.fn.countAll<string>().as('n'))
             .where('authorId', '=', user.id).where('status', 'in', OPEN_STATUSES).executeTakeFirstOrThrow()
         if (Number(open.n) >= MAX_OPEN_REQUESTS) {
             throw fail(409, `You can have at most ${MAX_OPEN_REQUESTS} open change requests. Withdraw one, or wait for one to be reviewed.`)
         }
         const request = await db.insertInto('changeRequest')
-            .values({ layerId: body.layerId, authorId: user.id, title: body.title, ops: JSON.stringify(body.ops) })
+            .values({ layerId: body.layerId, authorId: user.id, title: body.title, ops: JSON.stringify(body.ops), status })
             .returningAll().executeTakeFirstOrThrow()
         return c.json(await present(request, user, true), 201)
     })
 
-    // Editing a request makes it a draft again, to be submitted once it's ready.
+    // Editing a request makes it a draft again (or stale), to be submitted
+    // once it's ready.
     app.put('/requests/:id', async c => {
         const { user, request } = await ownOpen(c)
         const body = await parseBody(c, RequestBody)
-        check(request.layerId, body.ops)
-        await setStatus(request.id, 'draft', { title: body.title, ops: JSON.stringify(body.ops), submittedAt: null })
+        await setStatus(request.id, check(request.layerId, body.ops), { title: body.title, ops: JSON.stringify(body.ops), submittedAt: null })
         return c.json(await present(await load(request.id), user, true))
     })
 
     app.post('/requests/:id/submit', async c => {
         const { user, request } = await ownOpen(c)
-        check(request.layerId, request.ops)
+        if (check(request.layerId, request.ops) === 'stale') throw fail(409, 'Something this changes has changed since, so it needs updating first')
         if (!request.title) throw fail(400, 'Give your change request a title first')
         await setStatus(request.id, 'submitted', { submittedAt: new Date() })
         await askReviewers(request, user.username)
