@@ -13,10 +13,6 @@ import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam } from './url.ts'
 
-// Layers that are loaded (so references to them resolve) but can't be shown.
-// TODO: bring the Nether highway back.
-const PAUSED = ['nether']
-
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
     const ready = new Promise<ReturnType<typeof createEditor>>(resolve => { resolveEditor = resolve })
@@ -37,10 +33,9 @@ async function main() {
     })
     // Plus, for their admins, layers waiting for approval, to keep working on.
     const [built, pending] = await Promise.all([loadLayers(), loadPending()])
-    const allLayers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
-    const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
+    const layers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
     const { map, dynmap } = createMap()
-    addPanes(map, allLayers.map(l => l.layer.id))
+    addPanes(map, layers.map(l => l.layer.id))
 
     // Everything that can be shown or hidden: each map layer, plus the dynmap
     // image beneath them. Official layers are listed in the layers control by
@@ -62,7 +57,7 @@ async function main() {
     const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap Scrape', group: dynmap, byDefault: true, stacks: false }], community.browse)
     openNewLayer = community.openNew
 
-    const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
+    const index = new ObjectIndex(layers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.label(o))
     const editor = createEditor(map, layers, index)

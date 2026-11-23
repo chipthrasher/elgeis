@@ -1,6 +1,7 @@
 // Names drawn inside polygons. Each name sits at the point deepest inside its
-// polygon. Names that would overlap are hidden, with roomier polygons getting
-// first pick, so small polygons get their names when nothing's in the way.
+// polygon, or just above or below it if a point is in the way. Names that
+// would overlap are hidden, with roomier polygons getting first pick, so small
+// polygons get their names when nothing's in the way.
 
 import L from 'leaflet'
 import polylabel from 'polylabel'
@@ -50,17 +51,30 @@ export function addLabels(map: L.Map, objects: MapObject[], labelOf: (o: MapObje
     const GAP = 4
 
     function fit() {
-        const zoom = map.getZoom()
+        // Points, like portals, can be drawn over names, so a name that would
+        // be covered by one moves a line up or down if there's room.
+        const container = map.getContainer()
+        const origin = container.getBoundingClientRect()
+        const points = [...container.querySelectorAll('.leaflet-marker-icon.point')]
+            .map(e => e.getBoundingClientRect())
+            .filter(r => r.width)
+            .map(r => L.bounds([r.left - origin.left, r.top - origin.top], [r.right - origin.left, r.bottom - origin.top]))
+
         const placed: L.Bounds[] = []
         for (const { span, latLng } of labels) {
             // Labels in hidden layers aren't in the page and measure 0.
             const size = L.point(span.offsetWidth + GAP, span.offsetHeight + GAP)
             if (size.x === GAP) continue
-            const center = map.project(latLng, zoom)
-            const box = L.bounds(center.subtract(size.divideBy(2)), center.add(size.divideBy(2)))
-            const crowded = placed.some(b => b.overlaps(box))
-            span.classList.toggle('crowded', crowded)
-            if (!crowded) placed.push(box)
+            const center = map.latLngToContainerPoint(latLng)
+            const spots = [0, -size.y, size.y].map(dy => {
+                const middle = center.add([0, dy])
+                return { dy, box: L.bounds(middle.subtract(size.divideBy(2)), middle.add(size.divideBy(2))) }
+            })
+            const free = (box: L.Bounds) => !placed.some(b => b.overlaps(box))
+            const spot = spots.find(s => free(s.box) && !points.some(b => b.overlaps(s.box))) ?? (free(spots[0].box) ? spots[0] : null)
+            span.classList.toggle('crowded', !spot)
+            span.style.marginTop = `${spot?.dy ?? 0}px`
+            if (spot) placed.push(spot.box)
         }
     }
     map.on('zoomend overlayadd overlayremove', fit)
