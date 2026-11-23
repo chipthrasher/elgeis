@@ -75,6 +75,9 @@ export const Layer = z.object({
     official: z.boolean().optional(),
     // An official layer that's listed but turned off until the viewer turns it on.
     startsOff: z.boolean().optional(),
+    // The base layer, like the political map: always drawn beneath the other
+    // layers (but above the dynmap image), and faded while any of them is shown.
+    base: z.boolean().optional(),
     titleField: fieldKey,
     // A shorter name drawn on the map instead of the title, when set.
     labelField: fieldKey.optional(),

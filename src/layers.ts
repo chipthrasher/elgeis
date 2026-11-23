@@ -80,6 +80,11 @@ export function addPanes(map: L.Map, layerIds: string[]) {
     }
 }
 
+// Fade a whole layer, by --opacity-faded (see style.css).
+export function fadeLayer(map: L.Map, layerId: string, on: boolean) {
+    for (const kind of PANES) map.getPane(paneFor(layerId, kind))?.classList.toggle('faded', on)
+}
+
 // Stack the layers' panes in this order, bottom first.
 export function stackLayers(map: L.Map, bottomFirst: string[]) {
     bottomFirst.forEach((id, rank) => PANES.forEach((kind, i) => {

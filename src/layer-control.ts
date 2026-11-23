@@ -2,7 +2,9 @@
 // the order they're stacked, top first. Drag a layer by its handle (or move it
 // with the arrow keys) to draw it above or below the others. Official layers
 // are always listed; community layers once they're turned on from "See more",
-// above the list. The dynmap image is always at the bottom.
+// above the list. The base layer (the political map) is always below the
+// others, and faded while any of them is shown, and the dynmap image is
+// always at the bottom.
 //
 // What's shown is kept in ?layers=, in the same order, top first, so views
 // can be shared. It's left out when the view is the default. Which community
@@ -10,7 +12,7 @@
 
 import L from 'leaflet'
 import { el, mobile } from './dom.ts'
-import { stackLayers } from './layers.ts'
+import { fadeLayer, stackLayers } from './layers.ts'
 import { getParam, setParam } from './url.ts'
 
 export interface Toggle {
@@ -23,6 +25,8 @@ export interface Toggle {
     startsOff?: boolean
     // Whether it has panes of its own to stack. The dynmap image doesn't.
     stacks: boolean
+    // Stays below the other layers that stack, and fades while they're shown.
+    base?: boolean
 }
 
 export type LayerControl = ReturnType<typeof createLayerControl>
@@ -30,15 +34,18 @@ export type LayerControl = ReturnType<typeof createLayerControl>
 // `more` opens what "See more" shows: the layers that aren't listed by default.
 export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => void) {
     const byId = (id: string) => toggles.find(t => t.id === id)
-    const defaults = toggles.filter(t => t.stacks && t.byDefault)
-    // What can't be stacked is listed below the rest, in a fixed order.
-    const fixed = toggles.filter(t => !t.stacks)
+    const movable = (t?: Toggle) => !!t?.stacks && !t.base
+    const defaults = toggles.filter(t => movable(t) && t.byDefault)
+    // The base layers, then what can't be stacked, are listed below the
+    // rest, in a fixed order.
+    const bases = toggles.filter(t => t.stacks && t.base)
+    const fixed = [...bases, ...toggles.filter(t => !t.stacks)]
 
     // The listed layers that stack, top first: those in ?layers=, in its
     // order, then the community layers listed here before, then any other
     // official layers.
     const param = getParam('layers')?.split(',')
-    const stacking = (ids: string[]) => ids.flatMap(id => byId(id)?.stacks ? [byId(id)!] : [])
+    const stacking = (ids: string[]) => ids.flatMap(id => movable(byId(id)) ? [byId(id)!] : [])
     let order = [...new Set([...stacking(param ?? []), ...stacking(loadListed()), ...defaults])]
     const shownByDefault = toggles.filter(t => t.byDefault && !t.startsOff)
     for (const t of toggles) if (param ? param.includes(t.id) : shownByDefault.includes(t)) t.group.addTo(map)
@@ -53,7 +60,11 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
         setParam('layers', isDefault ? null : shown.join(','))
     }
 
-    const restack = () => stackLayers(map, order.map(t => t.id).reverse())
+    function restack() {
+        stackLayers(map, [...bases, ...[...order].reverse()].map(t => t.id))
+        const covered = order.some(t => map.hasLayer(t.group))
+        for (const t of bases) fadeLayer(map, t.id, covered)
+    }
 
     function reorder(next: Toggle[]) {
         order = next
@@ -148,6 +159,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
         if (!t || !listed(t)) return
         for (const box of container.querySelectorAll<HTMLInputElement>(`[data-id="${t.id}"] input`)) box.checked = map.hasLayer(t.group)
         map.fire(e.type === 'layeradd' ? 'overlayadd' : 'overlayremove', { layer: t.group, name: t.name })
+        restack()
         save()
     })
 
