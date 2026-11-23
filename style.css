@@ -640,6 +640,11 @@ dialog.browse .gear {
   line-height: 1;
 }
 
+/* Beside a layer's name, rather than at the end of its row */
+dialog.browse .browse-head .gear {
+  font-size: 1.2rem;
+}
+
 dialog.browse .browse-row[hidden] {
   display: none;
 }
