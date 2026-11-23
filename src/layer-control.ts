@@ -19,6 +19,8 @@ export interface Toggle {
     group: L.Layer
     // Official layers: always listed, and shown when there's no ?layers=.
     byDefault: boolean
+    // An official layer that's listed but not shown by default.
+    startsOff?: boolean
     // Whether it has panes of its own to stack. The dynmap image doesn't.
     stacks: boolean
 }
@@ -38,7 +40,8 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
     const param = getParam('layers')?.split(',')
     const stacking = (ids: string[]) => ids.flatMap(id => byId(id)?.stacks ? [byId(id)!] : [])
     let order = [...new Set([...stacking(param ?? []), ...stacking(loadListed()), ...defaults])]
-    for (const t of toggles) if (param ? param.includes(t.id) : t.byDefault) t.group.addTo(map)
+    const shownByDefault = toggles.filter(t => t.byDefault && !t.startsOff)
+    for (const t of toggles) if (param ? param.includes(t.id) : shownByDefault.includes(t)) t.group.addTo(map)
 
     const listed = (t: Toggle) => order.includes(t) || fixed.includes(t)
     const shownIds = (view: Toggle[]) => view.filter(t => map.hasLayer(t.group)).map(t => t.id)
@@ -46,7 +49,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
     function save() {
         storeListed(order)
         const shown = shownIds([...order, ...fixed])
-        const isDefault = shown.join() === [...defaults, ...fixed.filter(t => t.byDefault)].map(t => t.id).join()
+        const isDefault = shown.join() === [...defaults, ...fixed].filter(t => shownByDefault.includes(t)).map(t => t.id).join()
         setParam('layers', isDefault ? null : shown.join(','))
     }
 

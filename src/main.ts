@@ -41,7 +41,7 @@ async function main() {
     // image beneath them. Official layers are listed in the layers control by
     // default, top first in the order they come in; community layers once
     // they're turned on under its "See more".
-    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
+    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, startsOff: l.layer.startsOff, stacks: true })
     const community = createCommunity({
         layers,
         control: () => control,

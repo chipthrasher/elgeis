@@ -208,6 +208,10 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
             await api(`layers/${info.id}/official`, { official: !info.official })
             return `It's ${info.official ? 'a community layer' : 'official'} now. Reload the page to see the change on the map.`
         })
+        const toggleStartsOff = act(async () => {
+            await api(`layers/${info.id}/official`, { official: true, startsOff: !info.startsOff })
+            return `It's turned ${info.startsOff ? 'on' : 'off'} by default now. Reload the page to see the change on the map.`
+        })
         const toggleHidden = act(async () => {
             await api(`layers/${info.id}/hidden`, { hidden: !info.hidden })
             return `It's ${info.hidden ? 'shown' : 'hidden'} now. Reload the page to see the change on the map.`
@@ -220,10 +224,11 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
         return el('div', {}, [
             el('h3', {}, 'Moderation'),
             el('p', { class: 'muted' }, info.official
-                ? "It's official, so it shows on the map by default, and can't be hidden or deleted."
+                ? `It's official, so it's in everyone's list of layers, turned ${info.startsOff ? 'off' : 'on'} until they change it, and can't be hidden or deleted.`
                 : `It's a community layer${info.hidden ? ', hidden' : ''}, so people turn it on from "See more". Official layers show on the map by default. Hiding a layer takes it off the map until it's shown again.`),
             el('div', { class: 'row' }, [
                 !info.pending && !info.hidden && button(info.official ? 'Make it a community layer' : 'Make it official', toggleOfficial, 'link'),
+                info.official && button(info.startsOff ? 'Turn it on by default' : 'Turn it off by default', toggleStartsOff, 'link'),
                 !info.official && !info.pending && button(info.hidden ? 'Show' : 'Hide', toggleHidden, 'link'),
                 !info.official && button('Delete', remove, 'link'),
             ]),
