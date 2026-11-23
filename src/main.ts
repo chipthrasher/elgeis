@@ -1,6 +1,6 @@
 // Entry point
 
-import { createAccount, linkButton } from './account.ts'
+import { createAccount, getUser, linkButton } from './account.ts'
 import { api } from './api.ts'
 import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
@@ -64,11 +64,13 @@ async function main() {
     resolveEditor!(editor)
     createSidebar(map, layers, index, editor.pick)
 
-    // What's open is in the path, like /moderate/accounts.
+    // What's open is in the path, like /moderate/accounts, for those allowed
+    // to see it: site admins, or for a layer's settings, its admins.
     const [page, ...rest] = location.pathname.split('/').filter(Boolean)
+    const [user, layerInfos] = await Promise.all([getUser().catch(() => null), api<{ id: string, canAdmin: boolean }[]>('layers').catch(() => [])])
     const failed = (title: string) => (e: unknown) => editor.show(title, (e as Error).message)
-    if (page === 'moderate') editor.moderate(rest[0]).catch(failed('Moderate'))
-    else if (page === 'layers' && rest[1] === 'settings') editor.settings(rest[0]).catch(failed('Layer settings'))
+    if (page === 'moderate' && user?.role === 'admin') editor.moderate(rest[0]).catch(failed('Moderate'))
+    else if (page === 'layers' && rest[1] === 'settings' && layerInfos.some(l => l.id === rest[0] && l.canAdmin)) editor.settings(rest[0]).catch(failed('Layer settings'))
     else setPath('/')
 
     // Links in notification emails open a change request.
