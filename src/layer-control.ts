@@ -50,7 +50,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
         setParam('layers', isDefault ? null : shown.join(','))
     }
 
-    const restack = () => stackLayers(map, order.map(t => t.id).reverse())
+    const restack = () => stackLayers(map, order.map(t => t.id).reverse(), id => map.hasLayer(byId(id)!.group))
 
     function reorder(next: Toggle[]) {
         order = next
@@ -145,6 +145,7 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
         if (!t || !listed(t)) return
         for (const box of container.querySelectorAll<HTMLInputElement>(`[data-id="${t.id}"] input`)) box.checked = map.hasLayer(t.group)
         map.fire(e.type === 'layeradd' ? 'overlayadd' : 'overlayremove', { layer: t.group, name: t.name })
+        restack()
         save()
     })
 

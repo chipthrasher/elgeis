@@ -75,17 +75,27 @@ export function addPanes(map: L.Map, layerIds: string[]) {
     parent.style.zIndex = '350'
     for (const id of layerIds) {
         PANES.forEach((kind, i) => {
-            if (!map.getPane(paneFor(id, kind))) map.createPane(paneFor(id, kind), parent).style.zIndex = String(i)
+            if (map.getPane(paneFor(id, kind))) return
+            const pane = map.createPane(paneFor(id, kind), parent)
+            pane.style.zIndex = String(i)
+            pane.classList.add('layer-pane')
         })
     }
 }
 
-// Stack the layers' panes in this order, bottom first.
-export function stackLayers(map: L.Map, bottomFirst: string[]) {
-    bottomFirst.forEach((id, rank) => PANES.forEach((kind, i) => {
-        const pane = map.getPane(paneFor(id, kind))
-        if (pane) pane.style.zIndex = String(rank * PANES.length + i)
-    }))
+// Stack the layers' panes in this order, bottom first. A shown layer is told
+// how many shown layers are above it (`--depth`), so style.css can fade the
+// layers behind the top one.
+export function stackLayers(map: L.Map, bottomFirst: string[], shown: (id: string) => boolean) {
+    let above = bottomFirst.filter(shown).length
+    bottomFirst.forEach((id, rank) => {
+        if (shown(id)) above--
+        PANES.forEach((kind, i) => {
+            const pane = map.getPane(paneFor(id, kind))
+            pane?.style.setProperty('z-index', String(rank * PANES.length + i))
+            pane?.style.setProperty('--depth', String(above))
+        })
+    })
 }
 
 // Leaflet only draws paths within the renderer's bounds (the view plus
