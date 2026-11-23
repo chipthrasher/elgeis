@@ -12,8 +12,9 @@
 :80 {
 	encode
 	# Browsers check these on every load, so a deploy shows up at once rather
-	# than mixing new scripts with a cached old stylesheet.
-	@code path / /index.html /style.css /dist/*
+	# than mixing new scripts with a cached old stylesheet. The page is served
+	# at every path that isn't a file (see below).
+	@code not path /api* /dist/layers/* /favicon.png /dynmap.jpg
 	header @code Cache-Control no-cache
 
 	handle /api* {
@@ -39,8 +40,11 @@
 		file_server
 	}
 
+	# Every other path is the page, which opens what the path names, like
+	# /moderate/accounts.
 	handle {
 		root * /srv/site
+		try_files {path} /index.html
 		file_server {
 			# In dev this is the whole checkout, so keep the private bits out.
 			hide .* node_modules secrets

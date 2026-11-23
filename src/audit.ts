@@ -3,6 +3,7 @@
 
 import { api } from './api.ts'
 import { attempt, button, el, errorBox } from './dom.ts'
+import { pathWhileOpen } from './url.ts'
 
 interface Entry {
     id: number
@@ -101,6 +102,7 @@ export function auditLog() {
     dialog.addEventListener('close', () => dialog.remove())
     document.body.append(dialog)
     dialog.showModal()
+    pathWhileOpen(dialog, '/moderate/audit')
     search.focus()
     load()
 }

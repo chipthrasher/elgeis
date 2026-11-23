@@ -7,6 +7,7 @@ import { getUser } from './account.ts'
 import { api, type FullLayer } from './api.ts'
 import { auditLog } from './audit.ts'
 import { attempt, button, el, errorBox } from './dom.ts'
+import { pathWhileOpen, setPath } from './url.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
 
@@ -187,6 +188,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
             await adminsSection(layerId),
             user?.role === 'admin' && info !== undefined && moderationSection(info),
         )
+        setPath(`/layers/${layerId}/settings`)
     }
 
     // Whether the layer is official, hidden, or deleted, for site admins.
@@ -260,19 +262,29 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
 
     /* Moderation, for site admins */
 
-    async function moderate() {
+    // Its windows, each at /moderate/<name>.
+    const moderationWindows = new Map<string, () => void>([
+        ['layers', () => layerList(moderate)],
+        ['accounts', () => users(moderate)],
+        ['audit', auditLog],
+    ])
+
+    // Opens one of its windows too, if asked.
+    async function moderate(open?: string) {
         const waiting = (await api<LayerInfo[]>('layers')).filter(l => l.pending).length
         show('Moderate',
             el('h3', {}, 'Layers'),
             el('p', { class: 'muted' }, 'New community layers wait for approval; rejecting one hides it.'),
-            el('div', { class: 'row' }, button(`Layers${waiting ? ` (${waiting} waiting)` : ''}…`, () => layerList(moderate))),
+            el('div', { class: 'row' }, button(`Layers${waiting ? ` (${waiting} waiting)` : ''}…`, moderationWindows.get('layers')!)),
             el('h3', {}, 'Accounts'),
             el('p', { class: 'muted' }, "Banned accounts are signed out, can't sign in or suggest changes, and their community layers are hidden until they're unbanned."),
-            el('div', { class: 'row' }, button('Accounts…', () => users(moderate))),
+            el('div', { class: 'row' }, button('Accounts…', moderationWindows.get('accounts')!)),
             el('h3', {}, 'Audit log'),
             el('p', { class: 'muted' }, 'Who signed up, signed in or failed to, and changed anything, for the past year.'),
-            el('div', { class: 'row' }, button('Audit log…', auditLog)),
+            el('div', { class: 'row' }, button('Audit log…', moderationWindows.get('audit')!)),
         )
+        setPath('/moderate')
+        if (open) moderationWindows.get(open)?.()
     }
 
     // A window listing every layer, those waiting for approval first, to
@@ -328,6 +340,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
         })
         document.body.append(dialog)
         dialog.showModal()
+        pathWhileOpen(dialog, '/moderate/layers')
         render()
     }
 
@@ -404,6 +417,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
         })
         document.body.append(dialog)
         dialog.showModal()
+        pathWhileOpen(dialog, '/moderate/accounts')
         search.focus()
         load()
     }

@@ -21,7 +21,7 @@ export interface MapLayer {
     group: L.LayerGroup
 }
 
-const BASE = 'dist/layers/'
+const BASE = '/dist/layers/'
 
 async function fetchJson(path: string) {
     const response = await fetch(path)

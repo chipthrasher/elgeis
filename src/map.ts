@@ -45,7 +45,7 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
 
     // A render of the world from the server's dynmap, drawn beneath every layer.
     // main.ts decides whether it shows.
-    const dynmap = L.imageOverlay('dynmap.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'dynmap', pane: 'tilePane' })
+    const dynmap = L.imageOverlay('/dynmap.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'dynmap', pane: 'tilePane' })
 
     // Coordinate readout (top-left), updated as the mouse moves. Phones have
     // no mouse, so there it shows the block under a crosshair in the middle.

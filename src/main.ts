@@ -11,7 +11,7 @@ import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers, loadPending, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
-import { getParam, setParam } from './url.ts'
+import { getParam, setParam, setPath } from './url.ts'
 
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
@@ -63,6 +63,13 @@ async function main() {
     const editor = createEditor(map, layers, index)
     resolveEditor!(editor)
     createSidebar(map, layers, index, editor.pick)
+
+    // What's open is in the path, like /moderate/accounts.
+    const [page, ...rest] = location.pathname.split('/').filter(Boolean)
+    const failed = (title: string) => (e: unknown) => editor.show(title, (e as Error).message)
+    if (page === 'moderate') editor.moderate(rest[0]).catch(failed('Moderate'))
+    else if (page === 'layers' && rest[1] === 'settings') editor.settings(rest[0]).catch(failed('Layer settings'))
+    else setPath('/')
 
     // Links in notification emails open a change request.
     const request = Number(getParam('request'))
