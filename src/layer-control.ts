@@ -4,7 +4,7 @@
 // are always listed; community layers once they're turned on from "See more",
 // above the list. The base layer (the political map) is always below the
 // others, and faded while any of them is shown, and the dynmap image is
-// always at the bottom.
+// always at the bottom, darkened while they're shown.
 //
 // What's shown is kept in ?layers=, in the same order, top first, so views
 // can be shared. It's left out when the view is the default. Which community
@@ -62,8 +62,11 @@ export function createLayerControl(map: L.Map, toggles: Toggle[], more: () => vo
 
     function restack() {
         stackLayers(map, [...bases, ...[...order].reverse()].map(t => t.id))
+        // While any other layer is shown, the base layers fade, and the
+        // dynmap image darkens (see style.css).
         const covered = order.some(t => map.hasLayer(t.group))
         for (const t of bases) fadeLayer(map, t.id, covered)
+        map.getContainer().classList.toggle('covered', covered)
     }
 
     function reorder(next: Toggle[]) {

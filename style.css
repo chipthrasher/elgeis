@@ -33,6 +33,7 @@
   --opacity-polygons: 0.5;    /* political region fills */
   --opacity-polygons-hover: 0.5;
   --opacity-faded: 0.5;       /* the base layer, while another layer is shown */
+  --opacity-dynmap-faded: 0.35; /* the base map image, then too */
 
   --line-width: 0.12rem;
   --box-shadow: 0.3rem 0.3rem 1.3rem rgba(0, 0, 0, 0.2);
@@ -902,6 +903,11 @@ path.editing {
 
 .dynmap {
   opacity: var(--opacity-dynmap);
+}
+
+/* While a layer other than the base one is shown (see layer-control.ts) */
+.covered .dynmap {
+  opacity: var(--opacity-dynmap-faded);
 }
 
 /* A whole layer, faded (see fadeLayer) */
