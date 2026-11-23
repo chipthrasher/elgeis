@@ -10,13 +10,6 @@ If you can accomplish something with less code, please do so. If you can accompl
 
 Built from [DESIGN.md](DESIGN.md). Each item should be one reviewable change. Items are numbered so they can be approved by number; when one is done, delete it and leave the other numbers alone.
 
-### Milestone 5: Mobile support
-
-Below 768px wide (`@media (max-width: 48rem)`), the layout changes. Desktop stays as it is.
-
-- **Mobile layout.** The sidebar becomes a bar across the top, above the map in the page flow (not floating over it), holding only the search box and a "Directory" button; the title, subtitle, "Try making your own maps" line, and the footer link are hidden. The map fills the rest of the screen. The directory is hidden until the button is pressed, then takes the whole screen below the search bar and hides the map; the button becomes "Map" to close it. Typing in the search opens the directory, and choosing a result closes it and pans the map there, as clicking a result does now. Use `100dvh`, not `100vh`, so the browser's address bar doesn't push the map off screen. Mostly CSS, plus a little JS in `sidebar.ts` for the button.
-- **Mobile map controls.** The account box collapses to a single "Account" button that opens it, and the editor panel opens full screen over the map with its close button in reach. The coordinate readout, which follows the mouse, shows the block at the middle of the screen instead (with a small crosshair there), since there's no mouse to hover. The layers control starts collapsed to its icon. Hover cards show on tap.
-
 ### Milestone 6: Nether highway
 
 - **Bring back the Nether highway.** Remove `nether` from `PAUSED` in `src/main.ts` so its portals and lines show on the map and in the directory again, and fix whatever needs fixing for it to render well alongside the political layer.

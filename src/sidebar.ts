@@ -44,6 +44,7 @@ function shapeOf(geometry: { type: string, geometries?: { type: string }[] } | n
 export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex, pick: (o: MapObject) => boolean) {
     const searchInput = document.querySelector<HTMLInputElement>('.search')!
     const directory = document.querySelector('#directory')!
+    const directoryToggle = document.querySelector('.directory-toggle')!
     const items = new Map<MapObject, HTMLDetailsElement>()
 
     // Objects with a title and something on the map are listed and searchable.
@@ -63,6 +64,24 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         }
         items.get(o)?.querySelector('summary')?.classList.toggle('hover', on)
     }
+
+    // Hovering an object or its entry highlights it and shows its card. With
+    // touch, a tap does, until the next tap. Browsers can send a stray
+    // mouseout once a tap changes the page, which this ignores.
+    let touch = false
+    let tapped: MapObject | null = null
+    function hover(o: MapObject, on: boolean) {
+        if (touch && !on) return
+        if (touch) tapped = o
+        highlight(o, on)
+        if (!on) o.drawn?.closeTooltip()
+    }
+    document.addEventListener('pointerdown', e => {
+        touch = false
+        if (tapped) hover(tapped, false)
+        tapped = null
+        touch = e.pointerType === 'touch'
+    }, true)
 
     /* Directory entries */
 
@@ -126,6 +145,15 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         ])
     }
 
+    // On phones, the directory takes the map's place while it's open (see
+    // style.css). Elsewhere this does nothing.
+    function openDirectory(open: boolean) {
+        document.body.classList.toggle('directory-open', open)
+        directoryToggle.textContent = open ? 'Map' : 'Directory'
+        // The map may have been hidden, so have Leaflet measure it again.
+        map.invalidateSize()
+    }
+
     // Pan to an object if it's entirely off-screen.
     function reveal(o: MapObject) {
         const bounds = o.drawn?.getBounds()
@@ -151,18 +179,21 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
             section.append(item)
 
             const summary = item.querySelector('summary')!
-            summary.addEventListener('click', () => reveal(o))
-            summary.addEventListener('mouseenter', () => { highlight(o, true); o.drawn?.openTooltip() })
-            summary.addEventListener('mouseleave', () => { highlight(o, false); o.drawn?.closeTooltip() })
+            summary.addEventListener('click', () => { openDirectory(false); reveal(o) })
+            summary.addEventListener('mouseenter', () => { hover(o, true); o.drawn?.openTooltip() })
+            summary.addEventListener('mouseleave', () => hover(o, false))
 
             // Polygons have their names drawn inside them instead (see labels.ts).
             if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
                 // A line's card follows the mouse along it.
                 o.drawn!.bindTooltip(hoverCard(o), { direction: 'right', offset: [8, 0], sticky: /LineString/.test(o.object.geometry?.type ?? '') })
             }
-            o.drawn!.on('mouseover', () => highlight(o, true))
-            o.drawn!.on('mouseout', () => highlight(o, false))
-            o.drawn!.on('click', () => { if (!pick(o)) select(o) })
+            // Leaflet opens the card on mouseover and on click, and hover()
+            // closes it.
+            o.drawn!.off('mouseout', o.drawn!.closeTooltip)
+            o.drawn!.on('mouseover', () => hover(o, true))
+            o.drawn!.on('mouseout', () => hover(o, false))
+            o.drawn!.on('click', () => { hover(o, true); if (!pick(o)) select(o) })
         }
         sections.set(mapLayer, section)
         directory.append(section)
@@ -230,7 +261,8 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
         if (item.open) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
 
-    searchInput.addEventListener('input', search)
+    searchInput.addEventListener('input', () => { search(); openDirectory(true) })
+    directoryToggle.addEventListener('click', () => openDirectory(!document.body.classList.contains('directory-open')))
     document.querySelector('.clear')!.addEventListener('click', () => setSearch(''))
     directory.addEventListener('click', e => {
         const value = (e.target as Element).closest('[data-search]')?.getAttribute('data-search')
