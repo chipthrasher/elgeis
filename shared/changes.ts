@@ -56,7 +56,8 @@ export const opId = (op: Op) => op.op === 'delete' ? op.id : op.object.id
 export interface CheckResult {
     // Every layer, with the ops applied.
     layers: LayerData[]
-    // What's wrong with the ops, as messages for their author.
+    // What's wrong with the ops, as messages for their author. Staleness
+    // isn't counted here: a stale draft can still be saved.
     errors: string[]
     // The objects the ops change that have changed since (or are gone), which
     // makes the request stale.
@@ -99,7 +100,6 @@ export function checkOps(layers: LayerData[], layerId: string, ops: Op[]): Check
         }
         objects.set(id, result.data)
     }
-    for (const id of stale) errors.push(`${id}: Changed since this request was made`)
 
     const changed: LayerData = { layer: target.layer, objects: [...objects.values()] }
     const applied = layers.map(l => l === target ? changed : l)

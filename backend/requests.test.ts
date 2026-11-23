@@ -75,7 +75,9 @@ test('invalid ops are refused', { skip }, async () => {
     assert.equal((await create([recolor('red')])).status, 400)
     assert.equal((await create([recolor('#00ff00'), recolor('#0000ff')])).status, 400) // same object twice
     assert.equal((await create([{ op: 'delete', id: 'ent_a', baseVersion: objectVersion(NATION) }])).status, 400) // its polygon lists it
-    assert.equal((await create([{ op: 'delete', id: 'ent_a', baseVersion: 'old' }, { op: 'delete', id: 'pol_a', baseVersion: objectVersion(POLYGON) }])).status, 400)
+    // Changes to an older version are kept, but need updating before they're submitted.
+    const stale = await json(await create([{ op: 'delete', id: 'ent_a', baseVersion: 'old' }, { op: 'delete', id: 'pol_a', baseVersion: objectVersion(POLYGON) }]))
+    assert.deepEqual([stale.code, stale.status], [201, 'stale'])
     assert.equal((await create([{ op: 'add', object: { ...NATION, id: 'ent_b' } }])).status, 400) // duplicate name
     // Entities are listed by ID, not name.
     assert.equal((await create([{ op: 'update', baseVersion: objectVersion(POLYGON), object: { ...POLYGON, properties: { entities: ['Adfelis'] } } }])).status, 400)
@@ -183,6 +185,21 @@ test("approving pulls in the remote's edits first, so it doesn't overwrite them"
     // Catching up again finds nothing new.
     await reconcile()
     assert.equal(git(remote, 'log', '-1', '--format=%s').trim(), 'By hand')
+})
+
+test('a draft made stale by another can still be edited, but not submitted', { skip }, async () => {
+    const { steve, admin } = await setup()
+    const first = await (await steve('/api/requests', { layerId: 'political', title: 'Green', ops: [recolor('#00ff00')] })).json()
+    await steve(`/api/requests/${first.id}/submit`, {})
+    const draft = await (await admin('/api/requests', { layerId: 'political', title: 'Blue', ops: [recolor('#0000ff')] })).json()
+    await admin(`/api/requests/${first.id}/approve`, {})
+
+    // Editing it keeps it stale, rather than refusing the edit.
+    const hide: Op = { op: 'update', baseVersion: objectVersion(POLYGON), object: { ...POLYGON, properties: { ...POLYGON.properties, hidden: true } } }
+    const edited = await json(await admin(`/api/requests/${draft.id}`, { title: 'Blue', ops: [recolor('#0000ff'), hide] }, 'PUT'))
+    assert.equal(edited.code, 200)
+    assert.equal(edited.status, 'stale')
+    assert.equal((await admin(`/api/requests/${draft.id}/submit`, {})).status, 409)
 })
 
 test('a request made stale by another stays in review, with what it was made from', { skip }, async () => {
