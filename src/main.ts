@@ -8,7 +8,7 @@ import { createLayerControl, type Toggle } from './layer-control.ts'
 import { emailSettings } from './notifications.ts'
 import { createMap } from './map.ts'
 import { addLabels } from './labels.ts'
-import { addPanes, colorPolygons, loadLayers, loadPending, type MapLayer } from './layers.ts'
+import { addPanes, colorObjects, loadLayers, loadPending, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
 import { getParam, setParam, setPath } from './url.ts'
@@ -58,7 +58,7 @@ async function main() {
     openNewLayer = community.openNew
 
     const index = new ObjectIndex(layers.flatMap(l => l.objects))
-    colorPolygons(index.all, o => index.colors(o))
+    colorObjects(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.label(o))
     const editor = createEditor(map, layers, index)
     resolveEditor!(editor)

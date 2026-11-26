@@ -178,7 +178,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
             choices,
             el('label', { class: 'field' }, [
                 el('span', {}, 'Default color'),
-                el('small', { class: 'help' }, "For areas without a color of their own, or from the political entities they list. Leave it empty for grey."),
+                el('small', { class: 'help' }, "For things without a color of their own, or from the political entities they list. Leave it empty for grey."),
                 el('div', { class: 'row' }, [defaultColor, colorPicker]),
             ]),
             el('label', { class: 'check' }, [hoverLines, ' Lines show their hover card',

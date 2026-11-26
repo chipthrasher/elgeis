@@ -149,20 +149,40 @@ export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     return drawn
 }
 
-// Fill polygons with their colors (their own, or their nation's). A polygon
+// Every Leaflet path or marker element an object is drawn with.
+export function elements(layer: L.Layer): Element[] {
+    if (layer instanceof L.LayerGroup) return layer.getLayers().flatMap(elements)
+    const element = (layer as L.Path | L.Marker).getElement?.()
+    return element ? [element] : []
+}
+
+// Color objects with their colors (their own, or their nation's). A polygon
 // with several colors, like one claimed by several nations, is hatched in all
-// of them. Patterns' IDs start with `prefix`, so several sets can coexist.
-// Returns a function that removes the patterns.
-export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => string[], prefix = 'hatch') {
+// of them; dots and lines take the first. Patterns' IDs start with `prefix`,
+// so several sets can coexist. Returns a function that removes the patterns.
+export function colorObjects(objects: MapObject[], colorsOf: (o: MapObject) => string[], prefix = 'hatch') {
     const patterns = new Map<string, string>()
     const defs = document.createElementNS(SVG_NS, 'defs')
 
     for (const o of objects) {
-        if (!o.drawn || !/Polygon/.test(o.object.geometry?.type ?? '')) continue
+        const drawn = o.drawn
+        if (!drawn) continue
         const colors = colorsOf(o)
         if (colors.length === 0) continue
+        if (!/Polygon/.test(o.object.geometry?.type ?? '')) {
+            // Overrides the colors .point and .line use in style.css. Leaflet
+            // makes new elements whenever a layer is re-added, so on every add.
+            const paint = () => elements(drawn).forEach(e => {
+                const { style } = e as HTMLElement
+                style.setProperty('--col-circles', colors[0])
+                style.setProperty('--col-lines', colors[0])
+            })
+            drawn.on('add', paint)
+            paint()
+            continue
+        }
         if (colors.length === 1) {
-            o.drawn.setStyle({ color: colors[0], fillColor: colors[0] })
+            drawn.setStyle({ color: colors[0], fillColor: colors[0] })
             continue
         }
         const key = colors.join(',')
@@ -171,7 +191,7 @@ export function colorPolygons(objects: MapObject[], colorsOf: (o: MapObject) => 
             patterns.set(key, id)
             defs.append(hatch(id, colors))
         }
-        o.drawn.setStyle({ color: colors[0], fillColor: `url(#${patterns.get(key)})` })
+        drawn.setStyle({ color: colors[0], fillColor: `url(#${patterns.get(key)})` })
     }
 
     // Patterns can be referenced from any SVG on the page, including Leaflet's.
