@@ -56,9 +56,12 @@ export function createSidebar(map: L.Map, layers: MapLayer[], index: ObjectIndex
     /* Highlighting: an object, plus everything it references or is referenced by */
 
     function highlight(o: MapObject, on: boolean) {
-        // Including what shares a reference, like the other polygons of a nation.
+        // An area also highlights the areas in its layer that share a
+        // reference with it, like the other polygons of a nation.
         const references = index.references(o)
-        const related = [o, ...references, ...index.referencers(o), ...references.flatMap(r => index.referencers(r))]
+        const isArea = (m: MapObject) => /Polygon/.test(m.object.geometry?.type ?? '')
+        const siblings = isArea(o) ? references.flatMap(r => index.referencers(r)).filter(s => s.layer === o.layer && isArea(s)) : []
+        const related = [o, ...references, ...index.referencers(o), ...siblings]
         for (const r of related) {
             for (const element of elementsOf(r)) element.classList.toggle('highlight', on)
         }

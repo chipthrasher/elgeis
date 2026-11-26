@@ -149,7 +149,13 @@ test('site admins mark layers official, and hide or delete community layers', { 
     assert.match(git(dir, 'show', `HEAD:${layer.id}/layer.json`), /"official": true/)
     assert.equal((await admin(`/api/layers/${layer.id}/hidden`, { hidden: true })).status, 409)
     assert.equal((await admin(`/api/layers/${layer.id}`, undefined, 'DELETE')).status, 409)
-    assert.equal((await json(await admin(`/api/layers/${layer.id}/official`, { official: false }))).official, undefined)
+
+    // They can be listed but turned off by default.
+    assert.equal((await json(await admin(`/api/layers/${layer.id}/official`, { official: true, startsOff: true }))).startsOff, true)
+    assert.match(git(dir, 'log', '-1', '--format=%s'), /Turn the Farms layer off by default/)
+    const community = await json(await admin(`/api/layers/${layer.id}/official`, { official: false, startsOff: true }))
+    assert.equal(community.official, undefined)
+    assert.equal(community.startsOff, undefined)
 
     // Deleting a layer takes its change requests with it.
     const object = { type: 'Feature', id: 'pnt_farm', geometry: { type: 'Point', coordinates: [1, 2] }, properties: { name: 'Wheat' } }

@@ -3,9 +3,11 @@
 // official, hide or delete community layers, ban accounts, and read the audit log.
 
 import { FIELD_TYPES, ICONS, type Field, type FieldType, type Layer } from '../shared/layer.ts'
+import { getUser } from './account.ts'
 import { api, type FullLayer } from './api.ts'
 import { auditLog } from './audit.ts'
 import { attempt, button, el, errorBox } from './dom.ts'
+import { pathWhileOpen, setPath } from './url.ts'
 
 type Show = (title: string, ...children: (Node | string | null | false)[]) => void
 
@@ -54,7 +56,8 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
     /* A layer's settings, for its admins */
 
     async function settings(layerId: string, notice = '') {
-        const { layer, objects } = await load(layerId, true)
+        const [{ layer, objects }, user, infos] = await Promise.all([load(layerId, true), getUser().catch(() => null), api<LayerInfo[]>('layers')])
+        const info = infos.find(i => i.id === layerId)
         const fields: Field[] = layer.fields.map(f => ({ ...f }))
         // Fields added here, whose keys come from their labels when saved.
         const added = new Set<Field>()
@@ -183,7 +186,54 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
             error,
             el('div', { class: 'row' }, [button('Save', save, 'primary')]),
             await adminsSection(layerId),
+            user?.role === 'admin' && info !== undefined && moderationSection(info),
         )
+        setPath(`/layers/${layerId}/settings`)
+    }
+
+    // Whether the layer is official, hidden, or deleted, for site admins.
+    // Official layers can't be hidden or deleted, and hidden ones can't be
+    // made official.
+    function moderationSection(info: LayerInfo) {
+        const error = errorBox()
+        const act = (action: () => Promise<string | null>) => () => attempt(error, async () => {
+            const notice = await action()
+            if (notice) settings(info.id, notice)
+        })
+        const toggleOfficial = act(async () => {
+            if (!confirm(info.official
+                ? `Are you sure you want to make ${info.name} a community layer?\n\nIt will stop showing on the map by default. This is a potentially destructive action.`
+                : `Are you sure you want to make ${info.name} official?\n\nIt will show on the map by default. This is a potentially destructive action.`
+            )) return null
+            await api(`layers/${info.id}/official`, { official: !info.official })
+            return `It's ${info.official ? 'a community layer' : 'official'} now. Reload the page to see the change on the map.`
+        })
+        const toggleStartsOff = act(async () => {
+            await api(`layers/${info.id}/official`, { official: true, startsOff: !info.startsOff })
+            return `It's turned ${info.startsOff ? 'on' : 'off'} by default now. Reload the page to see the change on the map.`
+        })
+        const toggleHidden = act(async () => {
+            await api(`layers/${info.id}/hidden`, { hidden: !info.hidden })
+            return `It's ${info.hidden ? 'shown' : 'hidden'} now. Reload the page to see the change on the map.`
+        })
+        const remove = () => attempt(error, async () => {
+            if (!confirm(`Delete ${info.name}, and every change request to it, for good?`)) return
+            await api(`layers/${info.id}`, undefined, 'DELETE')
+            show(info.name, el('p', { class: 'notice' }, 'Deleted. Reload the page to see the change on the map.'))
+        })
+        return el('div', {}, [
+            el('h3', {}, 'Moderation'),
+            el('p', { class: 'muted' }, info.official
+                ? `It's official, so it's in everyone's list of layers, turned ${info.startsOff ? 'off' : 'on'} until they change it, and can't be hidden or deleted.`
+                : `It's a community layer${info.hidden ? ', hidden' : ''}, so people turn it on from "See more". Official layers show on the map by default. Hiding a layer takes it off the map until it's shown again.`),
+            el('div', { class: 'row' }, [
+                !info.pending && !info.hidden && button(info.official ? 'Make it a community layer' : 'Make it official', toggleOfficial, 'link'),
+                info.official && button(info.startsOff ? 'Turn it on by default' : 'Turn it off by default', toggleStartsOff, 'link'),
+                !info.official && !info.pending && button(info.hidden ? 'Show' : 'Hide', toggleHidden, 'link'),
+                !info.official && button('Delete', remove, 'link'),
+            ]),
+            error,
+        ])
     }
 
     // The layer's admins, who review its change requests and edit its settings.
@@ -217,48 +267,86 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
 
     /* Moderation, for site admins */
 
-    async function moderate() {
-        // Those waiting for approval first.
-        const layers = (await api<LayerInfo[]>('layers')).sort((a, b) => Number(b.pending) - Number(a.pending))
-        const error = errorBox()
-        const act = (action: () => Promise<unknown>) => () => attempt(error, async () => {
-            await action()
-            moderate()
-        })
+    // Its windows, each at /moderate/<name>.
+    const moderationWindows = new Map<string, () => void>([
+        ['layers', () => layerList(moderate)],
+        ['accounts', () => users(moderate)],
+        ['audit', auditLog],
+    ])
 
+    // Opens one of its windows too, if asked.
+    async function moderate(open?: string) {
+        const waiting = (await api<LayerInfo[]>('layers')).filter(l => l.pending).length
         show('Moderate',
             el('h3', {}, 'Layers'),
-            el('p', { class: 'muted' }, 'Official layers show by default. New community layers wait for approval; rejecting one hides it. Hiding a community layer takes it off the map until it\'s shown again.'),
-            el('div', { class: 'moderated' }, layers.map(l => el('div', { class: 'change' }, [
-                el('div', {}, [el('strong', {}, l.name), ' ', el('span', { class: 'muted' }, [
-                    l.pending ? 'Waiting for approval' : l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`, l.creatorBanned && ' (banned)',
-                ].filter(Boolean).join(''))]),
-                el('div', { class: 'row' }, [
-                    button('Settings', () => settings(l.id), 'link'),
-                    l.pending && button('Approve', act(() => api(`layers/${l.id}/pending`, { approved: true })), 'link'),
-                    l.pending && button('Reject', act(async () => {
-                        if (confirm(`Reject ${l.name}? It will be hidden, which you can undo with Show.`)) await api(`layers/${l.id}/pending`, { approved: false })
-                    }), 'link'),
-                    !l.hidden && !l.pending && button(l.official ? 'Make it a community layer' : 'Make it official', act(async () => {
-                        if (confirm(l.official
-                            ? `Are you sure you want to make ${l.name} a community layer?\n\nIt will stop showing on the map by default. This is a potentially destructive action.`
-                            : `Are you sure you want to make ${l.name} official?\n\nIt will show on the map by default. This is a potentially destructive action.`
-                        )) await api(`layers/${l.id}/official`, { official: !l.official })
-                    }), 'link'),
-                    !l.official && !l.pending && button(l.hidden ? 'Show' : 'Hide', act(() => api(`layers/${l.id}/hidden`, { hidden: !l.hidden })), 'link'),
-                    !l.official && button('Delete', act(async () => {
-                        if (confirm(`Delete ${l.name}, and every change request to it, for good?`)) await api(`layers/${l.id}`, undefined, 'DELETE')
-                    }), 'link'),
-                ]),
-            ]))),
-            error,
+            el('p', { class: 'muted' }, 'New community layers wait for approval; rejecting one hides it.'),
+            el('div', { class: 'row' }, button(`Layers${waiting ? ` (${waiting} waiting)` : ''}…`, moderationWindows.get('layers')!)),
             el('h3', {}, 'Accounts'),
             el('p', { class: 'muted' }, "Banned accounts are signed out, can't sign in or suggest changes, and their community layers are hidden until they're unbanned."),
-            el('div', { class: 'row' }, button('Accounts…', () => users(moderate))),
+            el('div', { class: 'row' }, button('Accounts…', moderationWindows.get('accounts')!)),
             el('h3', {}, 'Audit log'),
             el('p', { class: 'muted' }, 'Who signed up, signed in or failed to, and changed anything, for the past year.'),
-            el('div', { class: 'row' }, button('Audit log…', auditLog)),
+            el('div', { class: 'row' }, button('Audit log…', moderationWindows.get('audit')!)),
         )
+        setPath('/moderate')
+        if (open) moderationWindows.get(open)?.()
+    }
+
+    // A window listing every layer, those waiting for approval first, to
+    // approve or reject, with a gear to open each one's settings.
+    // Calls back once it's closed if anything changed.
+    function layerList(changed: () => void) {
+        const dialog = el('dialog', { class: 'panel browse', 'aria-label': 'Layers' })
+        const close = () => dialog.close()
+        let dirty = false
+        const list = el('div', { class: 'browse-list' })
+        const error = errorBox()
+
+        const render = () => attempt(error, async () => {
+            const layers = (await api<LayerInfo[]>('layers')).sort((a, b) => Number(b.pending) - Number(a.pending))
+            const act = (action: () => Promise<unknown>) => () => attempt(error, async () => {
+                await action()
+                dirty = true
+                await render()
+            })
+            list.replaceChildren(...layers.map(l => {
+                // Off to its settings, so don't go back to Moderate.
+                const gear = button('⚙', () => { dirty = false; close(); settings(l.id) }, 'link gear')
+                gear.title = 'Layer settings'
+                gear.setAttribute('aria-label', `Settings for ${l.name}`)
+                return el('div', { class: 'browse-row' }, [
+                    el('span', { class: 'browse-text' }, [
+                        el('span', { class: 'browse-head' }, el('span', { class: 'browse-name' }, l.name)),
+                        el('small', {}, [
+                            l.pending ? 'Waiting for approval' : l.official ? 'Official' : 'Community', l.hidden && ', hidden', l.createdBy && `, made by ${l.createdBy}`, l.creatorBanned && ' (banned)',
+                        ].filter(Boolean).join('')),
+                    ]),
+                    el('div', { class: 'row' }, [
+                        l.pending && button('Approve', act(() => api(`layers/${l.id}/pending`, { approved: true })), 'link'),
+                        l.pending && button('Reject', act(async () => {
+                            if (confirm(`Reject ${l.name}? It will be hidden, which you can undo with Show.`)) await api(`layers/${l.id}/pending`, { approved: false })
+                        }), 'link'),
+                    ]),
+                    gear,
+                ])
+            }))
+        })
+
+        dialog.append(
+            el('div', { class: 'panel-head' }, [el('h2', {}, 'Layers'), button('×', close, 'link close')]),
+            el('p', { class: 'muted' }, 'Make a layer official, hide it, or delete it in its settings.'),
+            error,
+            list,
+        )
+        dialog.addEventListener('click', e => { if (e.target === dialog) close() })
+        dialog.addEventListener('close', () => {
+            dialog.remove()
+            if (dirty) changed()
+        })
+        document.body.append(dialog)
+        dialog.showModal()
+        pathWhileOpen(dialog, '/moderate/layers')
+        render()
     }
 
     // A window listing every account, newest first, to search and ban or
@@ -334,6 +422,7 @@ export function layerAdmin(show: Show, load: (layerId: string, fresh: boolean) =
         })
         document.body.append(dialog)
         dialog.showModal()
+        pathWhileOpen(dialog, '/moderate/accounts')
         search.focus()
         load()
     }

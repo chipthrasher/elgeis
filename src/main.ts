@@ -1,6 +1,6 @@
 // Entry point
 
-import { createAccount, linkButton } from './account.ts'
+import { createAccount, getUser, linkButton } from './account.ts'
 import { api } from './api.ts'
 import { createCommunity } from './community.ts'
 import { createEditor } from './editor.ts'
@@ -11,11 +11,7 @@ import { addLabels } from './labels.ts'
 import { addPanes, colorPolygons, loadLayers, loadPending, type MapLayer } from './layers.ts'
 import { ObjectIndex } from './objects.ts'
 import { createSidebar } from './sidebar.ts'
-import { getParam, setParam } from './url.ts'
-
-// Layers that are loaded (so references to them resolve) but can't be shown.
-// TODO: bring the Nether highway back.
-const PAUSED = ['nether']
+import { getParam, setParam, setPath } from './url.ts'
 
 async function main() {
     let resolveEditor: (editor: ReturnType<typeof createEditor>) => void
@@ -37,16 +33,15 @@ async function main() {
     })
     // Plus, for their admins, layers waiting for approval, to keep working on.
     const [built, pending] = await Promise.all([loadLayers(), loadPending()])
-    const allLayers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
-    const layers = allLayers.filter(l => !PAUSED.includes(l.layer.id))
+    const layers = [...built, ...pending.filter(p => !built.some(l => l.layer.id === p.layer.id))]
     const { map, dynmap } = createMap()
-    addPanes(map, allLayers.map(l => l.layer.id))
+    addPanes(map, layers.map(l => l.layer.id))
 
     // Everything that can be shown or hidden: each map layer, plus the dynmap
     // image beneath them. Official layers are listed in the layers control by
     // default, top first in the order they come in; community layers once
     // they're turned on under its "See more".
-    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, stacks: true })
+    const toggleOf = (l: MapLayer): Toggle => ({ id: l.layer.id, name: l.layer.name, group: l.group, byDefault: !!l.layer.official, startsOff: l.layer.startsOff, base: l.layer.base, stacks: true })
     const community = createCommunity({
         layers,
         control: () => control,
@@ -62,12 +57,21 @@ async function main() {
     const control = createLayerControl(map, [...layers.map(toggleOf), { id: 'dynmap', name: 'Dynmap Scrape', group: dynmap, byDefault: true, stacks: false }], community.browse)
     openNewLayer = community.openNew
 
-    const index = new ObjectIndex(allLayers.flatMap(l => l.objects))
+    const index = new ObjectIndex(layers.flatMap(l => l.objects))
     colorPolygons(index.all, o => index.colors(o))
     addLabels(map, index.all, o => index.label(o))
     const editor = createEditor(map, layers, index)
     resolveEditor!(editor)
     createSidebar(map, layers, index, editor.pick)
+
+    // What's open is in the path, like /moderate/accounts, for those allowed
+    // to see it: site admins, or for a layer's settings, its admins.
+    const [page, ...rest] = location.pathname.split('/').filter(Boolean)
+    const [user, layerInfos] = await Promise.all([getUser().catch(() => null), api<{ id: string, canAdmin: boolean }[]>('layers').catch(() => [])])
+    const failed = (title: string) => (e: unknown) => editor.show(title, (e as Error).message)
+    if (page === 'moderate' && user?.role === 'admin') editor.moderate(rest[0]).catch(failed('Moderate'))
+    else if (page === 'layers' && rest[1] === 'settings' && layerInfos.some(l => l.id === rest[0] && l.canAdmin)) editor.settings(rest[0]).catch(failed('Layer settings'))
+    else setPath('/')
 
     // Links in notification emails open a change request.
     const request = Number(getParam('request'))

@@ -19,6 +19,7 @@ import { toLatLng } from './map.ts'
 import type { ObjectIndex } from './objects.ts'
 import { Names } from './names.ts'
 import { describeOp, showChanges, showValue, staleIds } from './review.ts'
+import { setPath } from './url.ts'
 
 interface Draft {
     id?: number
@@ -58,7 +59,9 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
         return cache.get(layerId)!
     }
 
+    // What's shown sets its own path afterwards, if it has one.
     function show(title: string, ...children: (Node | string | null | false)[]) {
+        setPath('/')
         cleanup?.()
         cleanup = null
         undrawDraft?.()
@@ -74,6 +77,7 @@ export function createEditor(map: L.Map, layers: MapLayer[], index: ObjectIndex)
     const { settings, moderate } = layerAdmin(show, load)
 
     function close() {
+        setPath('/')
         cleanup?.()
         cleanup = null
         undrawDraft?.()

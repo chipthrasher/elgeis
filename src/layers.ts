@@ -21,7 +21,7 @@ export interface MapLayer {
     group: L.LayerGroup
 }
 
-const BASE = 'dist/layers/'
+const BASE = '/dist/layers/'
 
 async function fetchJson(path: string) {
     const response = await fetch(path)
@@ -78,6 +78,11 @@ export function addPanes(map: L.Map, layerIds: string[]) {
             if (!map.getPane(paneFor(id, kind))) map.createPane(paneFor(id, kind), parent).style.zIndex = String(i)
         })
     }
+}
+
+// Fade a whole layer, by --opacity-faded (see style.css).
+export function fadeLayer(map: L.Map, layerId: string, on: boolean) {
+    for (const kind of PANES) map.getPane(paneFor(layerId, kind))?.classList.toggle('faded', on)
 }
 
 // Stack the layers' panes in this order, bottom first.

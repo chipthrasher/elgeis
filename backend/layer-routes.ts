@@ -269,13 +269,18 @@ export function layerRoutes({ db, repo, siteUrl, serially, secret, mailFrom }: D
 
     app.post('/layers/:id/official', async c => {
         const user = siteAdmin(c)
-        const { official } = await parseBody(c, z.object({ official: z.boolean() }).strict())
+        const body = await parseBody(c, z.object({ official: z.boolean(), startsOff: z.boolean().optional() }).strict())
+        const official = body.official || undefined
+        // Only official layers start off; community layers always do.
+        const startsOff = (official && body.startsOff) || undefined
         await serially(async () => {
             const { layer } = find(c.req.param('id'))
             if (official && repo.hidden.has(layer.id)) throw fail(409, 'Show the layer before making it official')
-            if (!!layer.official === official) return
-            await save(user.id, { ...layer, official: official || undefined }, [],
-                `${official ? 'Make' : 'Stop making'} the ${layer.name} layer official\n\nChanged by ${user.username}.\n`)
+            if (layer.official === official && layer.startsOff === startsOff) return
+            const change = layer.official !== official
+                ? `${official ? 'Make' : 'Stop making'} the ${layer.name} layer official`
+                : `${startsOff ? 'Turn' : 'Stop turning'} the ${layer.name} layer off by default`
+            await save(user.id, { ...layer, official, startsOff }, [], `${change}\n\nChanged by ${user.username}.\n`)
             // A banned account's layer is hidden once it's a community layer.
             if (!official) await hideLayers(db, repo)
         })
