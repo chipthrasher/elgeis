@@ -84,8 +84,8 @@ export const Layer = z.object({
     // Whether hovering or clicking a line shows its hover card and finds it,
     // like a point. Off, lines let the mouse through to what's beneath.
     hoverLines: z.boolean().optional(),
-    // The color of areas with none of their own, and none from the entities
-    // they list. Without it, they're grey.
+    // The color of objects with none of their own, and none from the entities
+    // they list. Without it, areas are grey, and dots and lines light grey.
     defaultColor: Color.optional(),
     fields: z.array(Field),
 }).strict().superRefine((layer, ctx) => {

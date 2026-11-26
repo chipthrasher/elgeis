@@ -6,18 +6,12 @@ import tippy from 'tippy.js'
 import type { Field } from '../shared/layer.ts'
 import { el, safeUrl, svgFromMarkup } from './dom.ts'
 import { ICON_MARKUP } from './icons.ts'
-import type { MapLayer, MapObject } from './layers.ts'
+import { elements, type MapLayer, type MapObject } from './layers.ts'
 import { position, type ObjectIndex } from './objects.ts'
 import { getParam, setParam } from './url.ts'
 
 const PAN_SECONDS = 0.2
 
-// Every Leaflet path or marker element an object is drawn with.
-function elements(layer: L.Layer): Element[] {
-    if (layer instanceof L.LayerGroup) return layer.getLayers().flatMap(elements)
-    const element = (layer as L.Path | L.Marker).getElement?.()
-    return element ? [element] : []
-}
 const elementsOf = (o: MapObject) => o.drawn ? elements(o.drawn) : []
 
 // One solid color, or for a contested object, a band of each color side by side.

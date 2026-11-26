@@ -26,3 +26,8 @@ Our Dynmap is at http://dynmap.elgeis.com:10102/ (`/up/configuration` lists its 
 
 - **Scrape the Dynmap nightly.** A `dynmap` service in `compose.yaml` downloads the tiles covering the world border (-5500 to 5500) from 2 to 7 levels out (Leaflet zooms 2 to -3, which is as far in as our map goes), about 160k tiles, a few at a time so the server isn't swamped. It saves them in Leaflet's own `<zoom>/<x>/<y>.png` layout in a `tiles` volume, so the frontend needs no knowledge of Dynmap's scheme, and keeps each tile's ETag beside it, so a nightly run only downloads what changed. Each tile is written to a temporary file and renamed into place, so a half-done run never shows a broken tile. It runs once at start if the volume is empty. Caddy serves the volume at `/tiles/`.
 - **Draw the scraped tiles.** In `map.ts`, an `L.tileLayer('/tiles/{z}/{x}/{y}.png', { tileSize: 128, minNativeZoom: -3, maxNativeZoom: 2 })` bounded at the world border replaces the `dynmap.jpg` image overlay, keeping its name in the layers control, its opacity, and its place at the bottom. Then delete `dynmap.jpg`.
+
+### Other Stuff
+
+- How can people maintain the political entity list?
+- When you click "Edit", and you select something outside the layer you're currently selected to Edit, it needs to swap over!

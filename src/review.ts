@@ -12,7 +12,7 @@ import { DIMENSION_SCALE, valuesOf, type Field, type Layer, type LayerObject, ty
 import type { ChangeRequest, FullLayer } from './api.ts'
 import { el } from './dom.ts'
 import { addLabels } from './labels.ts'
-import { colorPolygons, draw, type MapLayer, type MapObject } from './layers.ts'
+import { colorObjects, draw, type MapLayer, type MapObject } from './layers.ts'
 import { toLatLng } from './map.ts'
 import type { Names } from './names.ts'
 import { ObjectIndex } from './objects.ts'
@@ -64,7 +64,7 @@ export function showChanges(map: L.Map, layers: MapLayer[], index: ObjectIndex, 
             (changed.has(o.object.id) || stateIndex.references(o).some(r => changed.has(r.object.id))))
         const group = L.featureGroup(extras).addTo(map)
         for (const o of shown) o.drawn = draw(layer, o.object).addTo(group)
-        const uncolor = colorPolygons(shown, o => stateIndex.colors(o), 'review')
+        const uncolor = colorObjects(shown, o => stateIndex.colors(o), 'review')
         const unlabel = addLabels(map, shown, o => stateIndex.label(o))
         return () => { group.remove(); uncolor(); unlabel() }
     }
