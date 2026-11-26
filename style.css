@@ -917,7 +917,13 @@ path.editing {
 
 /* Map objects */
 
+/* Dots shrink as you zoom out: 10px at zoom 0, down to 4px at zoom -4.
+   --zoom is set in map.ts. */
 .point {
+  --size: clamp(4px, 10px + 1.5px * var(--zoom), 12px);
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2);
   border-radius: 50%;
   background: var(--col-circles);
   transition: 0.2s box-shadow;
@@ -926,6 +932,8 @@ path.editing {
 /* A ring around a dot, e.g. national exits */
 .point.ring {
   box-sizing: border-box;
+  /* Big enough that the ring and its gap still fit */
+  --size: clamp(8px, 10px + 1.5px * var(--zoom), 12px);
   border: 1.5px solid var(--col-circles);
   padding: 2px;
   background-clip: content-box;

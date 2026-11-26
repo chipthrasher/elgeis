@@ -47,6 +47,11 @@ export function createMap(): { map: L.Map, dynmap: L.ImageOverlay } {
     // main.ts decides whether it shows.
     const dynmap = L.imageOverlay('/dynmap.jpg', [[-MAP_SIZE, -MAP_SIZE], [MAP_SIZE, MAP_SIZE]], { className: 'dynmap', pane: 'tilePane' })
 
+    // Lets CSS size things by zoom level, e.g. dots shrinking as you zoom out.
+    const setZoom = () => map.getContainer().style.setProperty('--zoom', String(map.getZoom()))
+    map.on('zoomend', setZoom)
+    setZoom()
+
     // Coordinate readout (top-left), updated as the mouse moves. Phones have
     // no mouse, so there it shows the block under a crosshair in the middle.
     const readout = L.DomUtil.create('div', 'map-box leaflet-control-coordinates')

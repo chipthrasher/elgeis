@@ -115,7 +115,8 @@ export function draw(layer: Layer, object: LayerObject): L.GeoJSON {
     const drawn = L.geoJSON(object as GeoJsonObject, {
         coordsToLatLng: ([x, z]) => toLatLng(x * scale, z * scale),
         pointToLayer: (_, latlng) => L.marker(latlng, {
-            icon: L.divIcon({ className: ring ? 'point ring' : 'point', iconSize: [10, 10] }),
+            // Sized in CSS, so dots shrink as the map zooms out (see map.ts).
+            icon: L.divIcon({ className: ring ? 'point ring' : 'point', iconSize: null as unknown as L.PointExpression }),
             pane: paneFor(layer.id, 'points'),
             // Shapes being drawn snap to these (see draw.ts).
             snapIgnore: false,
