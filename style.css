@@ -955,11 +955,6 @@ path.editing {
   box-shadow: 0 0 0 3px white;
 }
 
-.line.highlight {
-  stroke: white;
-  stroke-opacity: 1;
-}
-
 .polygon.highlight {
   fill-opacity: var(--opacity-polygons-hover);
 }
